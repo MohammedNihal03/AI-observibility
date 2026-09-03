@@ -57,8 +57,19 @@ function labelFor(index: number, count: number): string {
 
 /**
  * Splits events into contiguous windows containing roughly equal numbers of
- * ACTIONS. Non-action events travel with the action they follow, so a window's
- * token totals and file counts stay coherent.
+ * ACTIONS.
+ *
+ * Boundaries fall immediately BEFORE the first action of the next window, not
+ * after the last action of this one. That difference is not cosmetic: an
+ * outcome event follows its action, so ending a window at its last action
+ * strands that action's result in the next window. The action was then counted
+ * as a failure in one window while its recovery landed in the following one,
+ * and because recoveries accumulate at window ends, every window looked better
+ * than the one before it. Three compositionally identical cycles measured
+ * recovery rates of 0.00, 0.00 and 1.00 - a flat session reading as improving.
+ *
+ * Cutting before the next action keeps each action's outcome in the same window
+ * as the action itself.
  */
 export function splitIntoWindows(
   events: readonly NormalizedAgentEvent[],
@@ -73,19 +84,22 @@ export function splitIntoWindows(
   if (actionIndices.length < count) return [];
 
   const perWindow = actionIndices.length / count;
-  const boundaries: { startIndex: number; endIndex: number }[] = [];
 
-  let cursor = 0;
+  // The event index at which each window's first action occurs.
+  const firstActionIndex: number[] = [];
   for (let window = 0; window < count; window += 1) {
-    const lastActionPosition = Math.min(
-      actionIndices.length - 1,
-      Math.ceil((window + 1) * perWindow) - 1,
-    );
-    const isLast = window === count - 1;
-    const endIndex = isLast ? events.length - 1 : (actionIndices[lastActionPosition] ?? cursor);
+    const position = Math.min(actionIndices.length - 1, Math.floor(window * perWindow));
+    firstActionIndex.push(actionIndices[position] ?? 0);
+  }
 
-    boundaries.push({ startIndex: cursor, endIndex });
-    cursor = endIndex + 1;
+  const boundaries: { startIndex: number; endIndex: number }[] = [];
+  for (let window = 0; window < count; window += 1) {
+    // Window 0 starts at 0 so leading context - the user's request, the first
+    // model response - is not discarded.
+    const startIndex = window === 0 ? 0 : (firstActionIndex[window] ?? 0);
+    const endIndex =
+      window === count - 1 ? events.length - 1 : (firstActionIndex[window + 1] ?? events.length) - 1;
+    boundaries.push({ startIndex, endIndex });
   }
 
   return boundaries.filter((boundary) => boundary.endIndex >= boundary.startIndex);
