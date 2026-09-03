@@ -39,8 +39,8 @@ const BEHAVIOR: BehavioralCounts = {
 };
 
 describe("countActions", () => {
-  it("counts only action events", () => {
-    expect(countActions(CORRECTION_SESSION)).toBe(2);
+  it("counts every action: one read, two edits and two bash calls", () => {
+    expect(countActions(CORRECTION_SESSION)).toBe(5);
   });
 
   it("is zero for a session with no actions", () => {
@@ -123,7 +123,8 @@ describe("computeSessionMetrics - with behavioral counts", () => {
   it("turns the counts into rates", () => {
     expect(metrics.recoveryRate).toBe(1);
     expect(metrics.correctionLoopRate).toBe(1);
-    expect(metrics.repetitionRate).toBe(0.5);
+    // One repeated action out of five: the second `npm test`.
+    expect(metrics.repetitionRate).toBe(0.2);
   });
 
   it("shows a recovered failure as a healthy session, not a broken one", () => {
