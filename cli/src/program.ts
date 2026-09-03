@@ -46,6 +46,16 @@ interface DemoCommandOptions {
   readonly speed: string;
 }
 
+interface ImportCommandOptions {
+  readonly list?: boolean;
+  readonly session?: string;
+  readonly file?: string;
+  readonly project?: string;
+  readonly watch?: boolean;
+  readonly includeSidechains?: boolean;
+  readonly server: string;
+}
+
 export interface ProgramOptions {
   /** Where command output goes. Injected so tests do not have to trap stdout. */
   readonly out?: (text: string) => void;
