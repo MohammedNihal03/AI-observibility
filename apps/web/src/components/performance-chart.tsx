@@ -185,7 +185,7 @@ export function PerformanceChart({ snapshot }: { snapshot: SessionSnapshot }) {
               dataKey="actions"
               tickLine={false}
               axisLine={false}
-              tick={{ fill: "#6b7280", fontSize: 11 }}
+              tick={{ fill: "#7d8492", fontSize: 11 }}
               tickMargin={10}
             />
             <YAxis
@@ -193,7 +193,7 @@ export function PerformanceChart({ snapshot }: { snapshot: SessionSnapshot }) {
               ticks={[0, 50, 100]}
               tickLine={false}
               axisLine={false}
-              tick={{ fill: "#6b7280", fontSize: 11 }}
+              tick={{ fill: "#7d8492", fontSize: 11 }}
               // Wide enough for a three-digit tick. At 44 with a negative left
               // margin, "100" rendered as "00".
               width={34}
@@ -219,7 +219,7 @@ export function PerformanceChart({ snapshot }: { snapshot: SessionSnapshot }) {
             <Line
               type="monotone"
               dataKey="success"
-              stroke="#6b7280"
+              stroke="#7d8492"
               strokeWidth={1.25}
               strokeDasharray="3 4"
               connectNulls

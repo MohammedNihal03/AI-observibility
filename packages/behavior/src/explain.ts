@@ -11,6 +11,7 @@ import type { HealthResult } from "./health.js";
 import type { LearningResult } from "./learning.js";
 import type { CorrectionLoopResult, RecoveryResult } from "./recovery.js";
 import type { RepetitionResult } from "./repetition.js";
+import { describeStrategy, type StrategyResult } from "./strategy.js";
 import type { Trend, TrendMetric, TrendSet } from "./trends.js";
 import { isLowerBetter } from "./trends.js";
 
@@ -82,6 +83,7 @@ export interface ExplainInputs {
   readonly learning: LearningResult;
   readonly degradation: DegradationResult;
   readonly repetition: RepetitionResult;
+  readonly strategies: StrategyResult;
   readonly recovery: RecoveryResult;
   readonly loops: CorrectionLoopResult;
   readonly contextPressure: number | null;
@@ -117,6 +119,20 @@ export function explainState(
         (worst !== undefined ? ` (${shortSignature(worst.signature)})` : ""),
       metric: "repeatedFailedActions",
       delta: inputs.repetition.longestConsecutiveFailureRun,
+    });
+  }
+
+  // A repeated approach that has never worked is the most actionable thing the
+  // engine can say, so it goes near the top rather than into the tail.
+  const worstStrategy = inputs.strategies.unproductive[0];
+  if (worstStrategy !== undefined) {
+    reasons.unshift({
+      type: "negative",
+      message:
+        `The same approach failed ${worstStrategy.occurrences} times ` +
+        `(${describeStrategy(worstStrategy)})`,
+      metric: "repeatedStrategy",
+      delta: worstStrategy.occurrences,
     });
   }
 
@@ -188,6 +204,20 @@ export function deriveSignals(
   config: ScoringConfig = DEFAULT_SCORING_CONFIG,
 ): readonly SignalCreate[] {
   const signals: SignalCreate[] = [];
+
+  for (const strategy of inputs.strategies.unproductive.slice(0, 3)) {
+    signals.push({
+      sessionId,
+      type: "repeated_strategy",
+      severity: strategy.occurrences >= 3 ? "critical" : "warning",
+      message: `${describeStrategy(strategy)} — tried ${strategy.occurrences} times, never worked`,
+      metadata: {
+        steps: [...strategy.steps],
+        occurrences: strategy.occurrences,
+        failed: strategy.failed,
+      },
+    });
+  }
 
   for (const repeated of inputs.repetition.repeatedSignatures) {
     if (repeated.longestFailureRun >= config.repetition.consecutiveFailureThreshold) {

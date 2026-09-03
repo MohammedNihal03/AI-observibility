@@ -396,3 +396,143 @@ export async function doctorReport(options: DoctorOptions = {}): Promise<string>
 
   return lines.join("\n");
 }
+
+/* -------------------------------------------------------------------------- */
+/* compare                                                                    */
+/* -------------------------------------------------------------------------- */
+
+/** Metrics reported as percentages rather than as 0-100 scores. */
+const RATE_METRICS: ReadonlySet<string> = new Set([
+  "successRate",
+  "errorRate",
+  "recoveryRate",
+  "repetitionRate",
+  "toolEfficiency",
+]);
+
+const METRIC_LABELS: Record<string, string> = {
+  health: "Health",
+  learning: "Learning",
+  successRate: "Success rate",
+  errorRate: "Error rate",
+  recoveryRate: "Recovery rate",
+  repetitionRate: "Repetition",
+  toolEfficiency: "Tool efficiency",
+};
+
+function value(metric: string, raw: number | null): string {
+  if (raw === null) return "n/a";
+  return RATE_METRICS.has(metric) ? `${Math.round(raw * 100)}%` : String(Math.round(raw));
+}
+
+/**
+ * The change, worded so the direction is unambiguous.
+ *
+ * An arrow alone is not enough: on error rate, "▲ -35 pts" has to be read as
+ * "improved by 35 points", and every reader pauses on it. The word says it.
+ */
+function change(metric: string, delta: number | null, better: boolean | null): string {
+  if (delta === null) return "";
+  const size = RATE_METRICS.has(metric)
+    ? `${delta > 0 ? "+" : ""}${Math.round(delta * 100)} pts`
+    : `${delta > 0 ? "+" : ""}${Math.round(delta)}`;
+  if (better === null) return `${size}  unchanged`;
+  return `${size}  ${better ? "better" : "worse"}`;
+}
+
+export interface CompareOptions extends CommandOptions {
+  readonly left?: string;
+  readonly right?: string;
+  readonly by?: string;
+  readonly json?: boolean;
+}
+
+/**
+ * `observatory compare` (BUILD.md section 65, V2).
+ *
+ * Two shapes: two sessions side by side, or every session grouped by model,
+ * goal or source. The wording stays on "difference" throughout — grouping
+ * sessions is observational, and the session count travels with every row so a
+ * comparison drawn from one session each is visibly worth nothing.
+ */
+export async function compareReport(options: CompareOptions = {}): Promise<string> {
+  const client = options.client ?? createApiClient(options.server);
+
+  if (options.by !== undefined) {
+    const result = await client.compareGroups(options.by);
+    if (options.json === true) return JSON.stringify(result, null, 2);
+
+    if (result.groups.length === 0) {
+      return `\n  No sessions carry a ${options.by} to group by.\n`;
+    }
+
+    const lines = [
+      "",
+      `  Sessions grouped by ${result.groupBy}`,
+      "",
+      `  ${pad("GROUP", 34)}${padStart("N", 3)}${padStart("HEALTH", 8)}${padStart("LEARNING", 10)}` +
+        `${padStart("SUCCESS", 9)}${padStart("RECOVERY", 10)}  STATES`,
+    ];
+
+    for (const group of result.groups) {
+      const states = (["improving", "stable", "degrading"] as const)
+        .map((state) => `${STATE_MARK[state] ?? ""}${group.states[state] ?? 0}`)
+        .join(" ");
+      lines.push(
+        `  ${pad(group.key, 34)}${padStart(String(group.sessions), 3)}` +
+          `${padStart(value("health", group.health), 8)}` +
+          `${padStart(value("learning", group.learning), 10)}` +
+          `${padStart(value("successRate", group.successRate), 9)}` +
+          `${padStart(value("recoveryRate", group.recoveryRate), 10)}  ${states}`,
+      );
+    }
+
+    lines.push("");
+    if (result.ungrouped > 0) {
+      lines.push(`  ${result.ungrouped} session(s) had no ${result.groupBy} and were left out.`);
+    }
+    lines.push("  Medians, not means. A group of one is a data point, not a comparison.");
+    lines.push("");
+    return lines.join("\n");
+  }
+
+  if (options.left === undefined || options.right === undefined) {
+    throw new Error("compare needs either --by <model|goal|source>, or two session ids");
+  }
+
+  const result = await client.compareSessions(options.left, options.right);
+  if (options.json === true) return JSON.stringify(result, null, 2);
+
+  // Ids on their own lines: squeezing them into a 12-character column cut
+  // `demo_degrading_BA7E` down to `ading_BA7E`, which identifies nothing.
+  const lines = [
+    "",
+    `  left    ${result.left.session.id}   (${result.left.scores.state})`,
+    `  right   ${result.right.session.id}   (${result.right.scores.state})`,
+    "",
+    `  ${pad("", 18)}${padStart("LEFT", 9)}${padStart("RIGHT", 9)}   CHANGE`,
+  ];
+
+  for (const delta of result.deltas) {
+    lines.push(
+      `  ${pad(METRIC_LABELS[delta.metric] ?? delta.metric, 18)}` +
+        `${padStart(value(delta.metric, delta.left), 9)}` +
+        `${padStart(value(delta.metric, delta.right), 9)}   ` +
+        change(delta.metric, delta.delta, delta.better),
+    );
+  }
+
+  if (result.onlyRightSignals.length > 0) {
+    lines.push("");
+    lines.push("  Only on the right:");
+    for (const signal of result.onlyRightSignals.slice(0, 5)) lines.push(`    + ${signal}`);
+  }
+  if (result.onlyLeftSignals.length > 0) {
+    lines.push("");
+    lines.push("  Only on the left:");
+    for (const signal of result.onlyLeftSignals.slice(0, 5)) lines.push(`    - ${signal}`);
+  }
+
+  lines.push("");
+  return lines.join("\n");
+}

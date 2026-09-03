@@ -10,6 +10,7 @@ import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 
+import { compareGroups, compareSessions, type GroupBy } from "./compare.js";
 import type { Hub } from "./hub.js";
 import { analyzeStoredSession, buildSnapshot, buildSummary, toTimelineEntry } from "./snapshot.js";
 
@@ -31,6 +32,12 @@ const eventBatchSchema = z.union([
   z.object({ events: z.array(agentEventInputSchema).min(1).max(1000) }),
   z.array(agentEventInputSchema).min(1).max(1000),
 ]);
+
+const compareQuerySchema = z.object({
+  left: z.string().min(1).optional(),
+  right: z.string().min(1).optional(),
+  by: z.enum(["model", "goal", "source"]).optional(),
+});
 
 const listQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(500).optional(),
@@ -228,6 +235,33 @@ export function registerRoutes(app: FastifyInstance, options: RouteOptions): voi
       offset: query.success ? (query.data.offset ?? 0) : 0,
     });
     return reply.send({ sessionId: request.params.id, events, count: events.length });
+  });
+
+  /* ----------------------------------------------------------------- compare */
+
+  /**
+   * Section 65's V2 comparisons. `?left=&right=` compares two sessions;
+   * `?by=model|goal|source` compares groups of them.
+   */
+  app.get("/api/compare", async (request, reply) => {
+    const query = compareQuerySchema.safeParse(request.query ?? {});
+    if (!query.success) {
+      return reply.code(400).send({ error: "invalid_query", issues: query.error.issues });
+    }
+
+    if (query.data.by !== undefined) {
+      return reply.send(compareGroups(app.store, query.data.by as GroupBy));
+    }
+
+    if (query.data.left === undefined || query.data.right === undefined) {
+      return reply
+        .code(400)
+        .send({ error: "invalid_query", message: "pass either by=, or both left= and right=" });
+    }
+
+    const comparison = compareSessions(app.store, query.data.left, query.data.right);
+    if (comparison === undefined) return reply.code(404).send({ error: "unknown_session" });
+    return reply.send(comparison);
   });
 
   /* ------------------------------------------------------------------ stream */

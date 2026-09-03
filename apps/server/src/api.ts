@@ -11,3 +11,12 @@ export { loadConfig, type ServerConfig } from "./config.js";
 export { startServer, PortInUseError, type RunningServer, type StartOptions } from "./start.js";
 export { createDatabase, type DatabaseHandle } from "./db/client.js";
 export { createStore, type Store } from "./db/store.js";
+export {
+  compareGroups,
+  compareSessions,
+  type GroupBy,
+  type GroupComparison,
+  type GroupStats,
+  type MetricDelta,
+  type SessionComparison,
+} from "./compare.js";

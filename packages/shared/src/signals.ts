@@ -18,6 +18,8 @@ export const SIGNAL_TYPES = [
   // Repetition (sections 15, 16)
   "repeated_action_detected",
   "repeated_failed_action",
+  // V2 (section 65): the same APPROACH repeated, across different targets.
+  "repeated_strategy",
   // Recovery and correction (sections 17, 18)
   "correction_loop_completed",
   "recovery_succeeded",

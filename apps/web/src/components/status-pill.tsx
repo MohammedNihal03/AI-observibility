@@ -13,20 +13,28 @@ import type { SessionSnapshot } from "@observatory/shared";
 export function StatusPill({
   snapshot,
   live,
+  loading = false,
 }: {
   snapshot: SessionSnapshot | null;
   live: boolean;
+  /** True until the first snapshot lands. Distinct from being disconnected. */
+  loading?: boolean;
 }) {
   const active = snapshot !== null && snapshot.session.status === "active";
   const streaming = live && active;
 
+  // "Connecting" and "Offline" are different claims, and the first paint used
+  // to make the second one: a page still fetching its first snapshot announced
+  // that it had lost a connection it had not yet opened.
   const [dot, text, tone] = streaming
     ? ["bg-healthy", "Live", "border-healthy/30 bg-healthy/[0.08] text-healthy"]
     : live
       ? ["bg-clay", "Connected", "border-clay/25 bg-clay/[0.07] text-clay-soft"]
-      : snapshot === null
-        ? ["bg-fg-faint", "Offline", "border-border bg-surface text-fg-faint"]
-        : ["bg-fg-faint", "Recorded", "border-border bg-surface text-fg-faint"];
+      : loading && snapshot === null
+        ? ["bg-fg-faint", "Connecting", "border-border bg-surface text-fg-faint"]
+        : snapshot === null
+          ? ["bg-fg-faint", "Offline", "border-border bg-surface text-fg-faint"]
+          : ["bg-fg-faint", "Recorded", "border-border bg-surface text-fg-faint"];
 
   return (
     <div
@@ -36,7 +44,11 @@ export function StatusPill({
       <span
         aria-hidden="true"
         className={`size-1.5 rounded-full ${dot}`}
-        style={streaming ? { animation: "breathe 1.6s ease-in-out infinite" } : undefined}
+        style={
+          streaming || (loading && snapshot === null)
+            ? { animation: "breathe 1.6s ease-in-out infinite" }
+            : undefined
+        }
       />
       <span className="font-mono text-[10px] font-medium uppercase tracking-[0.16em]">{text}</span>
       {snapshot?.session.simulated === true ? (

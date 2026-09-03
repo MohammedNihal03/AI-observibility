@@ -21,7 +21,12 @@
 
   --color-fg: #ecedee;
   --color-fg-muted: #9ba1ab;
-  --color-fg-faint: #6b7280;
+  /*
+   * Faint text carries labels, units and timestamps - small type, and the
+   * hardest thing on the page to read. #6b7280 measured 4.05:1 against the
+   * canvas, under the 4.5:1 WCAG AA needs for text this size. This is 5.21:1.
+   */
+  --color-fg-faint: #7d8492;
 
   /* The clay of the Claude marks. One accent, nothing else. */
   --color-clay: #d97757;

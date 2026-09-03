@@ -37,7 +37,14 @@ export function DashboardApp() {
           <SessionPicker sessions={sessions} activeId={activeId} onSelect={select} />
         ) : null
       }
-      status={status === "unreachable" ? null : <StatusPill snapshot={snapshot} live={live} />}
+      // No pill when there is no session to describe. "Offline" would be
+      // false - the server answered, it simply has nothing recorded - and the
+      // empty and unreachable states already say which of the two it is.
+      status={
+        status === "unreachable" || status === "empty" ? null : (
+          <StatusPill snapshot={snapshot} live={live} loading={status === "loading"} />
+        )
+      }
     >
       {children}
     </AppShell>

@@ -78,7 +78,42 @@ export interface ApiClient {
     events: readonly AgentEventInput[],
   ): Promise<{ accepted: number; redactions: number }>;
   listSessions(): Promise<{ sessions: SessionSummary[] }>;
+  compareSessions(left: string, right: string): Promise<CompareResponse>;
+  compareGroups(by: string): Promise<GroupResponse>;
   endSession(sessionId: string): Promise<SessionRecord>;
+}
+
+/** Shapes the server returns from `/api/compare`. Kept structural on purpose:
+ *  the CLI only reads what it prints, and mirroring the server's full types
+ *  here would be a second definition to keep in step. */
+export interface CompareResponse {
+  left: { session: { id: string }; scores: { state: string } };
+  right: { session: { id: string }; scores: { state: string } };
+  deltas: {
+    metric: string;
+    left: number | null;
+    right: number | null;
+    delta: number | null;
+    better: boolean | null;
+  }[];
+  onlyLeftSignals: string[];
+  onlyRightSignals: string[];
+}
+
+export interface GroupResponse {
+  groupBy: string;
+  ungrouped: number;
+  groups: {
+    key: string;
+    sessions: number;
+    totalEvents: number;
+    health: number | null;
+    learning: number | null;
+    successRate: number | null;
+    recoveryRate: number | null;
+    repetitionRate: number | null;
+    states: Record<string, number>;
+  }[];
 }
 
 export function createApiClient(server: string = DEFAULT_SERVER): ApiClient {
@@ -113,6 +148,17 @@ export function createApiClient(server: string = DEFAULT_SERVER): ApiClient {
 
     listSessions() {
       return request(server, "/api/sessions?limit=25");
+    },
+
+    compareSessions(left, right) {
+      return request(
+        server,
+        `/api/compare?left=${encodeURIComponent(left)}&right=${encodeURIComponent(right)}`,
+      );
+    },
+
+    compareGroups(by) {
+      return request(server, `/api/compare?by=${encodeURIComponent(by)}`);
     },
 
     endSession(sessionId) {

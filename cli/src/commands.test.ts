@@ -60,6 +60,8 @@ function stubClient(options: { sessions?: SessionSummary[]; down?: boolean } = {
     sendEvent: fail,
     sendEvents: fail,
     endSession: fail,
+    compareSessions: fail,
+    compareGroups: fail,
   };
 }
 

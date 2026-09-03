@@ -104,6 +104,8 @@ function fakeClient(options: { existing?: number } = {}): ApiClient & {
     },
     listSessions: () => Promise.resolve({ sessions: [] }),
     endSession: () => Promise.reject(new Error("not used")),
+    compareSessions: () => Promise.reject(new Error("not used")),
+    compareGroups: () => Promise.reject(new Error("not used")),
   };
 }
 

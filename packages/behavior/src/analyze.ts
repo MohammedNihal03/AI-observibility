@@ -15,7 +15,7 @@ import { computeSessionMetrics, type SessionMetricsOptions } from "@observatory/
 import { computeDegradation, type DegradationResult } from "./degradation.js";
 import { deriveSignals, explainState } from "./explain.js";
 import {
-  createKeywordGoalDriftDetector,
+  createTokenGoalDriftDetector,
   NULL_GOAL_DRIFT_DETECTOR,
   type GoalDriftDetector,
   type SessionGoal,
@@ -25,6 +25,7 @@ import { computeLearning, type LearningResult } from "./learning.js";
 import { pairActionsWithOutcomes, type PairingResult } from "./pairing.js";
 import { analyzeRecovery, type CorrectionLoopResult, type RecoveryResult } from "./recovery.js";
 import { detectRepetition, type RepetitionResult } from "./repetition.js";
+import { detectStrategies, type StrategyResult } from "./strategy.js";
 import { computeTrends, type TrendSet } from "./trends.js";
 import { computeWindows, type WindowSet } from "./windows.js";
 
@@ -49,6 +50,8 @@ export interface BehaviorAnalysis {
   readonly counts: BehavioralCounts;
   readonly pairing: PairingResult;
   readonly repetition: RepetitionResult;
+  /** Repeated approaches, not just repeated actions (section 65, V2). */
+  readonly strategies: StrategyResult;
   readonly recovery: RecoveryResult;
   readonly loops: CorrectionLoopResult;
   readonly windows: WindowSet;
@@ -75,13 +78,14 @@ export function analyzeSession(
   const goal = options.goal;
   const detector =
     options.goalDriftDetector ??
-    (goal !== undefined ? createKeywordGoalDriftDetector() : NULL_GOAL_DRIFT_DETECTOR);
+    (goal !== undefined ? createTokenGoalDriftDetector() : NULL_GOAL_DRIFT_DETECTOR);
 
   const goalAdherenceFor = (slice: readonly NormalizedAgentEvent[]): number | null =>
     goal === undefined ? null : detector.measureAdherence(slice, goal);
 
   const pairing = pairActionsWithOutcomes(events);
   const repetition = detectRepetition(pairing.pairs, config);
+  const strategies = detectStrategies(pairing.pairs);
   const { recovery, loops } = analyzeRecovery(events, pairing.pairs);
   const goalAdherence = goalAdherenceFor(events);
 
@@ -128,6 +132,7 @@ export function analyzeSession(
     learning,
     degradation,
     repetition,
+    strategies,
     recovery,
     loops,
     contextPressure: metrics.contextPressure,
@@ -137,6 +142,7 @@ export function analyzeSession(
     counts,
     pairing,
     repetition,
+    strategies,
     recovery,
     loops,
     windows,

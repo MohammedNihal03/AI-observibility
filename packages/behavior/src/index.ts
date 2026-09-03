@@ -20,6 +20,9 @@ export type { AnalyzeOptions, BehaviorAnalysis } from "./analyze.js";
 export { actionsOf, isModification, pairActionsWithOutcomes } from "./pairing.js";
 export type { ActionOutcome, PairingResult, PairingStrategy } from "./pairing.js";
 
+export { describeStrategy, detectStrategies, EMPTY_STRATEGY, generalize } from "./strategy.js";
+export type { RepeatedStrategy, StrategyResult } from "./strategy.js";
+
 export { detectRepetition, EMPTY_REPETITION } from "./repetition.js";
 export type { RepeatedSignature, RepetitionResult } from "./repetition.js";
 
@@ -54,8 +57,11 @@ export type {
 
 export {
   createKeywordGoalDriftDetector,
+  createTokenGoalDriftDetector,
   extractKeywords,
   NULL_GOAL_DRIFT_DETECTOR,
+  stem,
+  tokenize,
 } from "./goal-drift.js";
 export type { GoalDriftDetector, SessionGoal } from "./goal-drift.js";
 

@@ -3,7 +3,13 @@ import { OBSERVATORY_VERSION } from "@observatory/shared";
 import { Command, InvalidArgumentError, Option } from "commander";
 
 import { DEFAULT_SERVER } from "./api.js";
-import { doctorReport, openDashboard, sessionsReport, statusReport } from "./commands.js";
+import {
+  compareReport,
+  doctorReport,
+  openDashboard,
+  sessionsReport,
+  statusReport,
+} from "./commands.js";
 import { demoSummary, formatDemoReport, runDemo } from "./demo.js";
 import { importClaudeCodeSession, listSessions } from "./import.js";
 import { streamDemo } from "./stream.js";
@@ -34,6 +40,12 @@ interface SessionsCommandOptions {
 interface DashboardCommandOptions {
   readonly url?: string;
   readonly print?: boolean;
+}
+
+interface CompareCommandOptions {
+  readonly by?: string;
+  readonly server: string;
+  readonly json?: boolean;
 }
 
 interface DoctorCommandOptions {
@@ -293,6 +305,47 @@ export function buildProgram(options: ProgramOptions = {}): Command {
       out("");
       out("Open the dashboard at http://127.0.0.1:4001 to see it.");
     });
+
+  program
+    .command("compare")
+    .description(
+      "Compare two sessions, or every session grouped by model, goal or source.\n" +
+        "Grouped comparison is observational: it shows differences, not causes.",
+    )
+    .argument("[left]", "session id to compare from")
+    .argument("[right]", "session id to compare to")
+    .addOption(
+      new Option("--by <key>", "group every session instead of comparing two").choices([
+        "model",
+        "goal",
+        "source",
+      ]),
+    )
+    .option("--server <url>", "Observatory API", DEFAULT_SERVER)
+    .option("--json", "print the raw comparison as JSON")
+    .action(
+      async (
+        left: string | undefined,
+        right: string | undefined,
+        commandOptions: CompareCommandOptions,
+      ) => {
+        if (commandOptions.by === undefined && (left === undefined || right === undefined)) {
+          throw new InvalidArgumentError(
+            "pass two session ids, or --by model|goal|source to group them",
+          );
+        }
+
+        out(
+          await compareReport({
+            server: commandOptions.server,
+            ...(commandOptions.by !== undefined ? { by: commandOptions.by } : {}),
+            ...(left !== undefined ? { left } : {}),
+            ...(right !== undefined ? { right } : {}),
+            ...(commandOptions.json === true ? { json: true } : {}),
+          }),
+        );
+      },
+    );
 
   program
     .command("doctor")

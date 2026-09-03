@@ -137,14 +137,133 @@ export function extractKeywords(text: string | null): readonly string[] {
   return [...new Set(tokens)];
 }
 
-/** Everything about an action that could mention the goal. */
+/**
+ * Everything about an action that could mention the goal.
+ *
+ * Case is PRESERVED. Lowercasing here destroyed the camelCase boundaries the
+ * tokenizer splits on, so `authTokens.ts` became one opaque word and never
+ * matched a goal that said "authentication". Each detector lowercases at the
+ * point it actually compares.
+ */
 function searchableText(event: NormalizedAgentEvent): string {
   return [event.signature, event.tool?.name, event.tool?.command, event.files?.path]
     .filter((part): part is string => typeof part === "string")
-    .join(" ")
-    .toLowerCase();
+    .join(" ");
 }
 
+/* -------------------------------------------------------------------------- */
+/* Token matching (section 65, V2)                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Splits text into words, including inside identifiers.
+ *
+ * `src/auth/tokenRefresh.test.ts` becomes
+ * `src auth token refresh test ts` - paths and camelCase carry most of the
+ * vocabulary an agent works with, and substring matching could not see into
+ * either.
+ */
+export function tokenize(text: string): readonly string[] {
+  return text
+    .replace(/([a-z0-9])([A-Z])/gu, "$1 $2")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/u)
+    .filter((token) => token.length >= MIN_KEYWORD_LENGTH && !STOP_WORDS.has(token));
+}
+
+/**
+ * Crude suffix stripping, so `tests` and `test`, or `authentication` and
+ * `authenticate`, reduce to a common form.
+ *
+ * Not a real stemmer. A Porter implementation would be a hundred lines to buy
+ * accuracy this measure cannot use: the result feeds a signal named "possible
+ * goal drift" that carries 10% of the degradation weight.
+ */
+export function stem(token: string): string {
+  for (const suffix of ["ations", "ation", "ings", "ing", "ers", "er", "ed", "es", "s"]) {
+    if (token.length - suffix.length >= 4 && token.endsWith(suffix)) {
+      return token.slice(0, token.length - suffix.length);
+    }
+  }
+  return token;
+}
+
+/** Shortest prefix that may stand in for a longer word: `auth` for `authentication`. */
+const MIN_PREFIX = 4;
+
+/**
+ * Whether two tokens refer to the same thing, as far as this can tell.
+ *
+ * Equality after stemming, or one being a prefix of the other. The prefix rule
+ * is what connects a goal that says "authentication" to a file called
+ * `auth.ts`, which is the single most common way a real goal relates to a real
+ * path and which substring matching got backwards - it could find "auth" inside
+ * "authentication", but never the reverse.
+ */
+function tokensMatch(goalToken: string, actionToken: string): boolean {
+  if (goalToken === actionToken) return true;
+
+  const left = stem(goalToken);
+  const right = stem(actionToken);
+  if (left === right) return true;
+
+  const shorter = left.length <= right.length ? left : right;
+  const longer = left.length <= right.length ? right : left;
+  return shorter.length >= MIN_PREFIX && longer.startsWith(shorter);
+}
+
+/**
+ * The default detector: token matching with stem and prefix tolerance.
+ *
+ * A step up from substring matching, and honestly still not semantic. It knows
+ * that `authentication` and `auth.ts` are related because one word starts the
+ * other. It does not know that `login` and `session-store` are related, because
+ * nothing short of a model does. `GoalDriftDetector` stays an interface so that
+ * a future embedding backend can answer that question without any other module
+ * changing.
+ */
+export function createTokenGoalDriftDetector(): GoalDriftDetector {
+  return {
+    name: "token",
+
+    measureAdherence(events, goal) {
+      const goalTokens = [
+        ...new Set([
+          ...goal.keywords.flatMap((keyword) => tokenize(keyword)),
+          ...tokenize(goal.text ?? ""),
+        ]),
+      ];
+
+      if (goalTokens.length === 0) return null;
+
+      const actions = events.filter(isActionEvent);
+      if (actions.length === 0) return null;
+
+      let related = 0;
+      for (const action of actions) {
+        const actionTokens = tokenize(searchableText(action));
+        const matched = actionTokens.some((actionToken) =>
+          goalTokens.some((goalToken) => tokensMatch(goalToken, actionToken)),
+        );
+        if (matched) related += 1;
+      }
+
+      // Same rule as the keyword detector: nothing matching anywhere is much
+      // more often a poor goal string than an agent that ignored its task.
+      if (related === 0) return null;
+
+      return related / actions.length;
+    },
+  };
+}
+
+/**
+ * The original substring detector.
+ *
+ * Kept exported so the two can be compared on a real session, and because a
+ * caller that wants the older, stricter behaviour should be able to ask for it
+ * by name rather than by pinning a version.
+ */
 export function createKeywordGoalDriftDetector(): GoalDriftDetector {
   return {
     name: "keyword",
@@ -164,7 +283,7 @@ export function createKeywordGoalDriftDetector(): GoalDriftDetector {
 
       let related = 0;
       for (const action of actions) {
-        const haystack = searchableText(action);
+        const haystack = searchableText(action).toLowerCase();
         if (keywords.some((keyword) => haystack.includes(keyword))) related += 1;
       }
 
