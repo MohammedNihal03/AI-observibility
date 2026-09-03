@@ -114,6 +114,40 @@ describe("normalizeCommand", () => {
     expect(normalizeCommand("Get-ChildItem")).toBe("Get-ChildItem");
   });
 
+  // Regression: a cwd written with backslashes - i.e. every real Windows
+  // session - used to build an invalid regex and throw.
+  it("accepts a working directory written with backslashes", () => {
+    const backslashCwd = "C:\\Users\\dev\\project";
+    expect(() => normalizeCommand("npm test", { cwd: backslashCwd })).not.toThrow();
+    expect(normalizeCommand("cat C:\\Users\\dev\\project\\src\\a.ts", { cwd: backslashCwd })).toBe(
+      "cat src/a.ts",
+    );
+  });
+
+  it("accepts a home directory written with backslashes", () => {
+    expect(normalizeCommand("cat C:\\Users\\dev\\.npmrc", { homeDir: "C:\\Users\\dev" })).toBe(
+      "cat ~/.npmrc",
+    );
+  });
+
+  it("treats both separator spellings of the working directory alike", () => {
+    const withBackslashes = normalizeCommand("cat C:/Users/dev/project/a.ts", {
+      cwd: "C:\\Users\\dev\\project",
+    });
+    const withSlashes = normalizeCommand("cat C:/Users/dev/project/a.ts", {
+      cwd: "C:/Users/dev/project",
+    });
+    expect(withBackslashes).toBe(withSlashes);
+  });
+
+  it("does not break on a path containing regex metacharacters", () => {
+    const cwd = "C:\\Users\\dev\\my (project) [v2]";
+    expect(() => normalizeCommand("npm test", { cwd })).not.toThrow();
+    expect(normalizeCommand("cat C:\\Users\\dev\\my (project) [v2]\\a.ts", { cwd })).toBe(
+      "cat a.ts",
+    );
+  });
+
   it("makes two spellings of the same invocation identical", () => {
     const a = normalizeCommand("npm   test --color ", { cwd: CWD });
     const b = normalizeCommand("npm test;", { cwd: CWD });

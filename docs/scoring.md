@@ -99,3 +99,39 @@ and says the maximum is unknown. No pricing for a model means `estimatedCost = n
 **Determinism.**
 Given the same events and the same configuration, the output is identical. No randomness, no clock
 reads inside scoring, no network calls, no LLM (sections 50, 57).
+
+## How each measured metric is defined
+
+Precision matters more than brevity here: a counter whose definition is unclear is worse than no
+counter, because it will be read as though it meant the obvious thing.
+
+| Metric             | Definition                                                                                                                     |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `totalToolCalls`   | Events that invoke a tool: `tool_call`, the three `file_*` types, `command_started`, `test_started`, `search`, `git_operation` |
+| `successRate`      | Successful outcomes ÷ outcomes with a **reported** status                                                                      |
+| `errorRate`        | Failed outcomes ÷ outcomes with a reported status                                                                              |
+| `toolEfficiency`   | Successful `tool_result`s ÷ all `tool_result`s                                                                                 |
+| `errors`           | Every event that failed — an `error` event, a failed command, a failed test                                                    |
+| `filesRead`        | **Distinct paths** read, not read operations                                                                                   |
+| `filesModified`    | **Distinct paths** written or edited                                                                                           |
+| `commandsExecuted` | `command_started` events, plus `tool_call`s carrying a command string                                                          |
+| `context.used`     | Peak of (input + cached) tokens on a single turn — a level, not a total                                                        |
+| `durationMs`       | Span from earliest to latest event timestamp                                                                                   |
+
+Three of these deserve their reasoning stated:
+
+**Outcomes with no reported status are excluded from both sides of a rate**, not counted as
+failures. An agent whose collector dropped a result did not fail — we simply do not know. Those
+calls are reported separately as `unresolvedToolCalls` so the dashboard can distinguish "the agent
+failed" from "the telemetry has a gap".
+
+**Tool efficiency divides by tool results, not tool invocations.** Section 13 writes the formula as
+`successfulToolCalls / totalToolCalls`, but its numerator is derived from results, so the
+denominator must be the same population. Dividing results by invocations produced 75/49 on a real
+session — over 1, clamped to a flattering 100%, while eight tool calls had in fact failed.
+
+**Context is a level, not a running total.** Summing every turn's input tokens yields a number many
+times larger than any real context window. The peak of (input + cached) on a single turn is what the
+model was actually handed, and taking the peak rather than the last value keeps a mid-session
+compaction from hiding that the window filled up. Output tokens are excluded: they are generated,
+not occupying the input window.

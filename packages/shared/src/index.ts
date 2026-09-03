@@ -95,6 +95,41 @@ export type {
   SignalType,
 } from "./signals.js";
 
-export { EMPTY_METRICS, metricsSnapshotCreateSchema, metricsSnapshotSchema } from "./metrics.js";
+export {
+  COST_SOURCES,
+  EMPTY_METRICS,
+  MAXIMUM_SOURCES,
+  metricsSnapshotCreateSchema,
+  metricsSnapshotSchema,
+} from "./metrics.js";
 
-export type { MetricsSnapshot, MetricsSnapshotCreate } from "./metrics.js";
+export {
+  DEFAULT_SCORING_CONFIG,
+  HEALTH_STATES,
+  assertValidScoringConfig,
+  healthStateFor,
+  validateScoringConfig,
+} from "./scoring.js";
+
+export type {
+  DegradationWeights,
+  HealthState,
+  HealthWeights,
+  LearningWeights,
+  ScoringConfig,
+  ScoringConfigProblem,
+} from "./scoring.js";
+
+export type {
+  BehavioralCounts,
+  ContextUsage,
+  CostEstimate,
+  CostSource,
+  MaximumSource,
+  MetricsSnapshot,
+  MetricsSnapshotCreate,
+  ModelPricing,
+  PricingRegistry,
+  SessionMetrics,
+  TokenUsage,
+} from "./metrics.js";

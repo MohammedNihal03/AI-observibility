@@ -21,14 +21,15 @@ correction loops, token and context usage. Every score comes with the reasons be
 
 Under active construction, one phase at a time (see `Build.md`, section 58).
 
-| Phase                      | State       |
-| -------------------------- | ----------- |
-| 0 — Repository inspection  | done        |
-| 1 — Monorepo foundation    | done        |
-| 2 — Event system           | done        |
-| 3 — SQLite persistence     | done        |
-| 4 — Metrics engine         | next        |
-| 5–13 — behavior → adapters | not started |
+| Phase                     | State       |
+| ------------------------- | ----------- |
+| 0 — Repository inspection | done        |
+| 1 — Monorepo foundation   | done        |
+| 2 — Event system          | done        |
+| 3 — SQLite persistence    | done        |
+| 4 — Metrics engine        | done        |
+| 5 — Behavioral engine     | next        |
+| 6–13 — demo → adapters    | not started |
 
 The CLI registers all of its commands today, but every command reports honestly that it is not
 implemented yet and names the phase that will implement it.

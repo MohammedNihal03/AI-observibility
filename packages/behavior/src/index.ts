@@ -6,19 +6,52 @@
  * IMPORTANT NAMING RULE (section 2): nothing in this package measures
  * neural-network learning. There are no gradients, no weights, no loss. The
  * "learning score" here is BEHAVIORAL learning - whether the agent's observable
- * behavior improves within a session. Never label it as model learning.
+ * behavior improved within a session. Never label it as model learning.
  *
- * PHASE 1 (current): package identity + build wiring only.
- * PHASE 5 fills in:
- *   repetition.ts        - normalized-string repeated-action detection (15, 16)
- *   correction-loops.ts  - edit -> test -> fail -> edit -> test -> pass (17)
- *   recovery.ts          - recovery score (18)
- *   trends.ts            - rolling early/middle/recent windows (21)
- *   learning.ts          - behavioral learning score + state (19, 20, 22)
- *   degradation.ts       - the seven degradation signals (23, 24)
- *   health.ts            - agent health score + state bands (25, 26)
- *   explain.ts           - reasons generated from real metrics only (27)
- *   goal-drift.ts        - GoalDriftDetector interface + keyword impl (28)
+ * Every export is a pure function. Order-sensitive by design: recovery and
+ * correction loops are properties of a sequence, not of individual events.
  */
 
 export const PACKAGE_NAME = "@observatory/behavior" as const;
+
+export { analyzeSession, signalsFor, toMetricsSnapshot } from "./analyze.js";
+export type { AnalyzeOptions, BehaviorAnalysis } from "./analyze.js";
+
+export { actionsOf, isModification, pairActionsWithOutcomes } from "./pairing.js";
+export type { ActionOutcome, PairingResult, PairingStrategy } from "./pairing.js";
+
+export { detectRepetition, EMPTY_REPETITION } from "./repetition.js";
+export type { RepeatedSignature, RepetitionResult } from "./repetition.js";
+
+export { analyzeRecovery, EMPTY_CORRECTION_LOOPS, EMPTY_RECOVERY } from "./recovery.js";
+export type { CorrectionLoopResult, FailureEpisode, RecoveryResult } from "./recovery.js";
+
+export { computeWindows, measureWindow, splitIntoWindows } from "./windows.js";
+export type { WindowMetrics, WindowOptions, WindowSet } from "./windows.js";
+
+export { computeTrend, computeTrends, improvementOf, isLowerBetter, TREND_METRICS } from "./trends.js";
+export type { Trend, TrendMetric, TrendSet } from "./trends.js";
+
+export { computeHealth } from "./health.js";
+export type { HealthComponent, HealthInputs, HealthResult } from "./health.js";
+
+export { computeLearning } from "./learning.js";
+export type { LearningComponent, LearningResult } from "./learning.js";
+
+export { computeDegradation } from "./degradation.js";
+export type {
+  DegradationInputs,
+  DegradationResult,
+  DegradationSignal,
+  DegradationSignalName,
+} from "./degradation.js";
+
+export {
+  createKeywordGoalDriftDetector,
+  extractKeywords,
+  NULL_GOAL_DRIFT_DETECTOR,
+} from "./goal-drift.js";
+export type { GoalDriftDetector, SessionGoal } from "./goal-drift.js";
+
+export { describeChange, deriveSignals, explainState } from "./explain.js";
+export type { ExplainInputs } from "./explain.js";

@@ -135,9 +135,23 @@ export const normalizedAgentEventSchema = agentEventSchema.extend({
 });
 export type NormalizedAgentEvent = z.infer<typeof normalizedAgentEventSchema>;
 
-/** Event types that represent a tool or command being invoked. */
+/**
+ * Event types where the agent invoked something - the canonical "action".
+ *
+ * This is the ONE definition of an action in the codebase. `totalToolCalls`
+ * counts it, repetition is detected over it, and repetition rate divides by it.
+ * When those populations were allowed to differ, tool efficiency exceeded 1 on
+ * a real session and was silently clamped to a flattering 100%.
+ *
+ * File operations belong here: adapters are required to emit semantic types, so
+ * a Claude Code `Read` arrives as `file_read` and is every bit as much an agent
+ * action as a `Bash` call.
+ */
 export const ACTION_EVENT_TYPES: readonly AgentEventType[] = [
   "tool_call",
+  "file_read",
+  "file_write",
+  "file_edit",
   "command_started",
   "test_started",
   "search",

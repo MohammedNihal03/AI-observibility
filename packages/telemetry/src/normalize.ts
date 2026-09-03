@@ -59,12 +59,20 @@ function escapeRegExp(value: string): string {
 /**
  * Builds a matcher for a directory prefix that accepts either path separator,
  * so a Windows `cwd` still matches a command that used forward slashes.
+ *
+ * Split first, then escape each segment, then join with a separator class.
+ * Doing it by successive `replace` calls over the escaped string does not work:
+ * the pass that handles backslashes inserts a `[\\/]` class, and the pass that
+ * handles forward slashes then rewrites the slash inside that class, producing
+ * `[\\[\\/]]` and an invalid regex. That only shows up for a `cwd` written with
+ * backslashes, which is every real Windows session.
  */
 function prefixMatcher(prefix: string): RegExp {
-  const pattern = escapeRegExp(prefix.replace(/[\\/]+$/u, ""))
-    .replace(/\\\\/gu, "[\\\\/]")
-    .replace(/\//gu, "[\\\\/]");
-  return new RegExp(pattern, "giu");
+  const segments = prefix
+    .replace(/[\\/]+$/u, "")
+    .split(/[\\/]+/u)
+    .map(escapeRegExp);
+  return new RegExp(segments.join("[\\\\/]"), "giu");
 }
 
 /**

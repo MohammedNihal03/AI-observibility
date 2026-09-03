@@ -55,6 +55,33 @@ estimating it from a pricing table.
 3. **JSONL tail** — works for any session with no configuration at all. The fallback, and the
    default.
 
+### Token usage must be deduplicated by `message.id`
+
+**This is the single easiest way to get the numbers badly wrong.** One API response is written to
+the transcript as several `assistant` lines — a thinking block, a text block, one per `tool_use` —
+and **every one of them repeats the same `usage` object**. Summing `usage` per line multiple-counts
+it.
+
+Measured on a real session:
+
+|          | assistant lines with `usage` | distinct `message.id` | ratio     |
+| -------- | ---------------------------- | --------------------- | --------- |
+| observed | 22                           | 8                     | **2.75×** |
+
+Summing naively gave 17,848 output tokens against a true 6,990 — a 2.6× overcount. Deduplicating by
+`message.id` gave 6,962, within 0.4%.
+
+Rules for the adapter:
+
+1. Keep a set of seen `message.id` values and emit **one** `model_response` event per id.
+2. Prefer the `cost-state` line as the authoritative session total when it is present. It is
+   Claude's own accounting, and it also covers sub-agent models whose lines may live in a sidechain
+   (the residual 12% gap on cached tokens above).
+3. Emit **semantic event types**, not bare `tool_call`s: `Read` → `file_read`, `Write` →
+   `file_write`, `Edit`/`NotebookEdit` → `file_edit`. The metrics engine counts files strictly by
+   type and refuses to guess whether a path was read or written, so an adapter that emits only
+   `tool_call` reports zero files touched.
+
 ### Limitations
 
 - **No context-window maximum is reported.** The transcript states the model but not its limit. Per
