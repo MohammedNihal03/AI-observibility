@@ -29,7 +29,10 @@ export function StatusPill({
         : ["bg-fg-faint", "Recorded", "border-border bg-surface text-fg-faint"];
 
   return (
-    <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 ${tone}`} role="status">
+    <div
+      className={`flex items-center gap-2 rounded-full border px-3 py-1.5 ${tone}`}
+      role="status"
+    >
       <span
         aria-hidden="true"
         className={`size-1.5 rounded-full ${dot}`}

@@ -31,3 +31,17 @@ export {
   isDemoScenario,
 } from "./demo.js";
 export type { DemoOptions, DemoScenario, DemoSession } from "./demo.js";
+
+export {
+  CLAUDE_CODE_HOME_DIR,
+  findTranscripts,
+  parseTranscript,
+  readTranscript,
+} from "./claude-code.js";
+export type {
+  DiscoverOptions,
+  ParseOptions,
+  TranscriptFile,
+  TranscriptParseResult,
+  TranscriptSession,
+} from "./claude-code.js";

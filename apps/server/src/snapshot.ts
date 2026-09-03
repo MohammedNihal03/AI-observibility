@@ -155,10 +155,7 @@ function buildTrend(
   const checkpoints = Math.min(CHECKPOINTS, actionIndices.length);
 
   for (let checkpoint = 1; checkpoint <= checkpoints; checkpoint += 1) {
-    const actionCount = Math.max(
-      1,
-      Math.round((checkpoint / checkpoints) * actionIndices.length),
-    );
+    const actionCount = Math.max(1, Math.round((checkpoint / checkpoints) * actionIndices.length));
     const lastAction = actionIndices[actionCount - 1] ?? 0;
     // Take the outcome that follows the action too, so a command and its result
     // are never split across a checkpoint boundary.

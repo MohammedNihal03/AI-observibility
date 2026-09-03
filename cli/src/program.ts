@@ -4,6 +4,7 @@ import { Command, InvalidArgumentError, Option } from "commander";
 
 import { DEFAULT_SERVER } from "./api.js";
 import { demoSummary, formatDemoReport, runDemo } from "./demo.js";
+import { importClaudeCodeSession, listSessions } from "./import.js";
 import { streamDemo } from "./stream.js";
 
 /** Phase in which each command becomes functional (BUILD.md section 58). */
@@ -101,7 +102,9 @@ export function buildProgram(options: ProgramOptions = {}): Command {
       if (commandOptions.stream === true) {
         const speed = Number.parseFloat(commandOptions.speed);
         if (!Number.isFinite(speed) || speed <= 0) {
-          throw new InvalidArgumentError(`--speed must be a positive number, got "${commandOptions.speed}"`);
+          throw new InvalidArgumentError(
+            `--speed must be a positive number, got "${commandOptions.speed}"`,
+          );
         }
 
         out(`Streaming a ${commandOptions.scenario} session to ${commandOptions.server}`);
@@ -141,6 +144,72 @@ export function buildProgram(options: ProgramOptions = {}): Command {
           ? JSON.stringify(demoSummary(run), null, 2)
           : formatDemoReport(run),
       );
+    });
+
+  program
+    .command("import")
+    .description(
+      "Observe a real Claude Code session by reading its local transcript.\n" +
+        "Only the shape of the work is sent - paths, commands, outcomes, token counts.\n" +
+        "File contents, command output and prompt text stay on your machine.",
+    )
+    .option("--list", "list the sessions that could be imported, newest first")
+    .option("--session <id>", "import a specific Claude Code session id (prefix is enough)")
+    .option("--file <path>", "import a specific transcript file")
+    .option("--project <name>", "only look at project directories matching this")
+    .option("--watch", "keep following the session as the agent works")
+    .option("--include-sidechains", "include sub-agent work in the parent session")
+    .option("--server <url>", "Observatory API to send to", DEFAULT_SERVER)
+    .action(async (commandOptions: ImportCommandOptions) => {
+      if (commandOptions.list === true) {
+        const found = await listSessions({
+          ...(commandOptions.project !== undefined ? { project: commandOptions.project } : {}),
+        });
+
+        if (found.length === 0) {
+          out("No Claude Code transcripts found under ~/.claude/projects.");
+          return;
+        }
+
+        out(`${found.length} session${found.length === 1 ? "" : "s"}, newest first:\n`);
+        for (const entry of found) {
+          const size = `${Math.max(1, Math.round(entry.sizeBytes / 1024))}KB`;
+          out(
+            `  ${entry.sessionId.slice(0, 8)}  ${entry.modifiedAt.slice(0, 19).replace("T", " ")}  ` +
+              `${size.padStart(7)}  ${entry.project}`,
+          );
+        }
+        return;
+      }
+
+      const result = await importClaudeCodeSession({
+        ...(commandOptions.file !== undefined ? { file: commandOptions.file } : {}),
+        ...(commandOptions.session !== undefined ? { sessionId: commandOptions.session } : {}),
+        ...(commandOptions.project !== undefined ? { project: commandOptions.project } : {}),
+        ...(commandOptions.includeSidechains === true ? { includeSidechains: true } : {}),
+        ...(commandOptions.watch === true ? { watch: true } : {}),
+        server: commandOptions.server,
+        onProgress: out,
+      });
+
+      const { parsed } = result;
+      out("");
+      out(`Imported ${result.sent} events from ${result.file}`);
+      out(
+        `  session   ${result.sessionId}` +
+          (result.alreadyStored > 0 ? ` (${result.alreadyStored} already stored)` : ""),
+      );
+      out(`  model     ${parsed.session.model ?? "unknown"}`);
+      out(`  goal      ${parsed.session.goal ?? "not stated"}`);
+      out(
+        `  skipped   ${parsed.skipped} bookkeeping lines, ${parsed.malformed} unreadable, ` +
+          `${parsed.duplicateUsage} duplicate usage blocks`,
+      );
+      if (result.redactions > 0) {
+        out(`  redacted  ${result.redactions} secrets before storage`);
+      }
+      out("");
+      out("Open the dashboard at http://127.0.0.1:4001 to see it.");
     });
 
   planned(program, "doctor", "Diagnose the local environment and agent integrations.");

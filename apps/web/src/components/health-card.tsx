@@ -65,7 +65,8 @@ export function HealthCard({ snapshot }: { snapshot: SessionSnapshot }) {
       <p className="mt-6 text-sm capitalize text-fg-muted">
         <span className="text-fg-faint">Band</span> {scores.healthState.replace("_", " ")}
         <span className="mx-2 text-border-strong">/</span>
-        <span className="text-fg-faint">Degradation</span> <Value>{scores.degradation ?? "n/a"}</Value>
+        <span className="text-fg-faint">Degradation</span>{" "}
+        <Value>{scores.degradation ?? "n/a"}</Value>
         <span className="text-fg-faint">/100</span>
       </p>
 

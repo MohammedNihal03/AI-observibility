@@ -323,9 +323,7 @@ describe("broadcast (section 31)", () => {
     expect(pushed?.type).toBe("snapshot");
     if (pushed?.type !== "snapshot") throw new Error("expected a snapshot");
     expect(pushed.snapshot.session.eventCount).toBe(before.session.eventCount + 2);
-    expect(pushed.snapshot.metrics.counters.errors).toBeGreaterThan(
-      before.metrics.counters.errors,
-    );
+    expect(pushed.snapshot.metrics.counters.errors).toBeGreaterThan(before.metrics.counters.errors);
   });
 
   it("delivers only to subscribers of that session", async () => {

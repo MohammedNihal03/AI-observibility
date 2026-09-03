@@ -1,4 +1,4 @@
-import type { AgentEventInput, SessionRecord } from "@observatory/shared";
+import type { AgentEventInput, SessionRecord, SessionSnapshot } from "@observatory/shared";
 
 /**
  * A minimal client for the local API (BUILD.md section 32).
@@ -58,11 +58,14 @@ export interface ApiClient {
   readonly server: string;
   health(): Promise<{ status: string; version: string; database: { sessions: number } }>;
   createSession(input: Record<string, unknown>): Promise<SessionRecord>;
+  /** Throws if the session is unknown - used to decide create-or-append. */
+  getSession(sessionId: string): Promise<SessionSnapshot>;
   sendEvent(sessionId: string, event: AgentEventInput): Promise<{ accepted: number }>;
   sendEvents(
     sessionId: string,
     events: readonly AgentEventInput[],
   ): Promise<{ accepted: number; redactions: number }>;
+  listSessions(): Promise<{ sessions: { id: string; state: string; health: number | null }[] }>;
   endSession(sessionId: string): Promise<SessionRecord>;
 }
 
@@ -78,6 +81,10 @@ export function createApiClient(server: string = DEFAULT_SERVER): ApiClient {
       return request(server, "/api/sessions", { method: "POST", body: JSON.stringify(input) });
     },
 
+    getSession(sessionId) {
+      return request(server, `/api/sessions/${encodeURIComponent(sessionId)}`);
+    },
+
     sendEvent(sessionId, event) {
       return request(server, `/api/sessions/${encodeURIComponent(sessionId)}/events`, {
         method: "POST",
@@ -90,6 +97,10 @@ export function createApiClient(server: string = DEFAULT_SERVER): ApiClient {
         method: "POST",
         body: JSON.stringify({ events }),
       });
+    },
+
+    listSessions() {
+      return request(server, "/api/sessions?limit=25");
     },
 
     endSession(sessionId) {

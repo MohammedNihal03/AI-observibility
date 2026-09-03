@@ -196,8 +196,11 @@ export function PerformanceChart({ snapshot }: { snapshot: SessionSnapshot }) {
               connectNulls
               dot={false}
               activeDot={{ r: 3.5, fill: "#d97757", stroke: "#0b0c0e", strokeWidth: 2 }}
-              isAnimationActive
-              animationDuration={900}
+              // Animation off, deliberately. Recharts restarts its draw on every
+              // data change, and a snapshot arriving mid-draw leaves the path
+              // unrendered - a live chart that blanks itself whenever new data
+              // lands. The panel's own entrance supplies the motion instead.
+              isAnimationActive={false}
             />
             <Line
               type="monotone"
@@ -208,8 +211,7 @@ export function PerformanceChart({ snapshot }: { snapshot: SessionSnapshot }) {
               connectNulls
               dot={false}
               activeDot={false}
-              isAnimationActive
-              animationDuration={1100}
+              isAnimationActive={false}
             />
           </ComposedChart>
         )}

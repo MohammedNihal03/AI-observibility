@@ -99,7 +99,10 @@ export function useObservatory(): Observatory {
         const current = activeRef.current;
         const stillThere = current !== null && list.some((session) => session.id === current);
 
-        if (!stillThere || (followLatest.current && newest !== undefined && newest.id !== current)) {
+        if (
+          !stillThere ||
+          (followLatest.current && newest !== undefined && newest.id !== current)
+        ) {
           setActiveId(newest?.id ?? null);
           setReceived(0);
         }

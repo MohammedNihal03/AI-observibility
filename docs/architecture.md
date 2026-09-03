@@ -87,13 +87,43 @@ Every score column is nullable, and null means "not computed". A snapshot taken 
 session has no meaningful recovery rate; writing `0` there would render as "0% recovery", which is a
 different and false claim.
 
+## The real-time path
+
+Ingestion runs in one fixed order, and the order is the design:
+
+```
+POST /api/sessions/:id/events
+        │
+   validate ──► normalize ──► REDACT ──► store ──► analyze ──► broadcast
+                                          │                        │
+                                       SQLite            WS /api/sessions/:id/stream
+```
+
+Redaction is upstream of both the database and the socket, so there is no point at which an
+unredacted payload exists on disk or on the wire. The analysis runs *after* persistence, so what a
+connected dashboard is told matches what a later page load will read back.
+
+The socket carries whole snapshots, not diffs. A diff protocol would put a second implementation of
+"what the numbers are" in the client, and the payload is a few kilobytes on loopback. The one thing
+the client polls is the session LIST: a session that did not exist when the page loaded cannot
+announce itself down a socket nobody has opened yet.
+
+`SessionSnapshot` (in `packages/shared`) is the contract between the two halves. The server owns
+every calculation; the dashboard owns every pixel. Neither reaches across, which is why the
+dashboard depends on `shared` alone and not on the analytics packages at all.
+
 ## The demo generator
 
 `packages/collectors/src/demo.ts` produces synthetic sessions for the three scenarios of Build.md
-section 34. It is a collector like any other: it emits `AgentEventInput`s and the CLI feeds them
-through validation, normalization, redaction, metrics and behavioral analysis. Nothing about the
-demo path bypasses the engine, so a demo verdict is produced by exactly the code that will judge a
-real session.
+section 34. It is a collector like any other: it emits `AgentEventInput`s, and they go through
+validation, normalization, redaction, metrics and behavioral analysis exactly as an agent's would —
+offline in the CLI, or over the API when `--stream` is used. Nothing about the demo path bypasses
+the engine, so a demo verdict is produced by exactly the code that will judge a real session.
+
+A streamed demo drops the generator's timestamps and lets the server stamp each event on arrival: a
+replayed session really is happening now, and reporting a duration the replay did not take would be
+the same small lie the rest of this codebase keeps refusing to tell. The gaps between events are
+preserved (divided by `--speed`), so the session keeps its rhythm.
 
 Two design decisions are worth knowing about:
 

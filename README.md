@@ -30,11 +30,15 @@ Under active construction, one phase at a time (see `Build.md`, section 58).
 | 4 — Metrics engine        | done        |
 | 5 — Behavioral engine     | done        |
 | 6 — Demo generator        | done        |
-| 7 — REST API + WebSocket  | next        |
-| 8–13 — Dashboard→adapters | not started |
+| 7 — REST API + WebSocket  | done        |
+| 8 — Dashboard             | done        |
+| 9 — Real-time dashboard   | done        |
+| 10 — CLI                  | next        |
+| 11–13 — Adapters, polish  | not started |
 
-`observatory demo` works today. The CLI's other commands report honestly that they are not
-implemented yet and name the phase that will implement them.
+The dashboard, the API and `observatory demo` all work today. The CLI's remaining commands
+(`start`, `status`, `sessions`, `dashboard`, `doctor`) report honestly that they are not implemented
+yet and name the phase that will implement them.
 
 ---
 
@@ -110,15 +114,30 @@ observatory doctor       Diagnose the local environment             (Phase 10)
 
 ## Seeing it work without an agent: `observatory demo`
 
+With `npm run dev` running, stream a simulated session into the dashboard and watch it fill in:
+
 ```bash
-npx tsx cli/src/index.ts demo --scenario improving
+npx tsx cli/src/index.ts demo --scenario improving --stream
+```
+
+The events are replayed one at a time into the API. On each arrival the server re-runs the engine
+and pushes a new snapshot down the WebSocket, so the health score, the chart, the signals and the
+timeline all move while you watch. The header shows **● LIVE** for exactly as long as the socket is
+open and the session is still running — never a moment longer.
+
+Add `--speed <n>` to replay faster or slower (default 6×), and `--server <url>` to point at a
+different API.
+
+Without `--stream` the demo runs entirely offline — generate, analyze, print — which needs no server
+at all:
+
+```bash
 npx tsx cli/src/index.ts demo --scenario stable
 npx tsx cli/src/index.ts demo --scenario degrading
 ```
 
-Each scenario generates a synthetic agent session and pushes it through the **real** pipeline —
-validation, normalization, redaction, metrics, behavioral analysis — then prints the verdict and the
-reasons behind it:
+Either way the session goes through the **real** pipeline — validation, normalization, redaction,
+metrics, behavioral analysis — and the offline report prints the verdict with the reasons behind it:
 
 ```
   AGENT HEALTH          74 / 100   stable (5/5 components measured)
@@ -147,8 +166,32 @@ names change), `--started-at <iso>`, `--json` for the full analysis, and `--even
 events as NDJSON.
 
 **Simulated data is always labelled as simulated.** The session id starts with `demo_`, every event
-carries `metadata.simulated = true`, and the report says so at the top. It is never presented as
-observed agent telemetry.
+carries `metadata.simulated = true`, and both the report and the dashboard say so. It is never
+presented as observed agent telemetry.
+
+---
+
+## The API
+
+The dashboard is a client of the local server like any other; it computes nothing itself.
+
+| Endpoint                          | What it does                                              |
+| --------------------------------- | --------------------------------------------------------- |
+| `POST /api/sessions`              | Create a session                                          |
+| `GET /api/sessions`               | List sessions with their headline scores                  |
+| `GET /api/sessions/:id`           | The full snapshot the dashboard renders                   |
+| `PATCH /api/sessions/:id`         | End a session, or correct its goal/model                  |
+| `POST /api/sessions/:id/events`   | Ingest one event or a batch                               |
+| `GET /api/sessions/:id/metrics`   | Metrics, the three windows, and the progress series       |
+| `GET /api/sessions/:id/health`    | Health, learning and degradation — with their reasons     |
+| `GET /api/sessions/:id/timeline`  | The activity rows                                         |
+| `GET /api/sessions/:id/events`    | The stored events themselves                              |
+| `WS /api/sessions/:id/stream`     | Live updates: `hello`, `event`, `snapshot`, `session_ended` |
+
+Ingestion follows one order, deliberately: **validate → normalize → redact → store → analyze →
+broadcast**. Redaction sits upstream of both the database and the socket, so neither can be handed a
+credential. The broadcast carries a freshly recomputed snapshot rather than a diff, so the client
+never has to hold a second opinion about what the numbers are.
 
 ---
 
