@@ -96,6 +96,7 @@ export function analyzeSession(
     repeatedFailedActions: repetition.repeatedFailedActions,
     correctionLoops: loops.correctionLoops,
     successfulCorrectionLoops: loops.successfulCorrectionLoops,
+    measurableActions: repetition.totalActions,
   };
 
   // Metrics are computed with the behavioural counts folded in, so the rates

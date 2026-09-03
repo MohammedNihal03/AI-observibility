@@ -67,6 +67,20 @@ export const isoTimestampSchema = z.iso.datetime({ offset: true });
 export const eventToolSchema = z.object({
   name: nonEmptyString,
   command: z.string().optional(),
+  /**
+   * What the tool acted on, when it is not a command or a file path: a search
+   * pattern, a URL, a query.
+   *
+   * This exists because repetition detection needs to tell two calls to the
+   * same tool apart. Without it, fourteen different `Grep` searches all reduce
+   * to the signature `tool_call|tool:Grep` and read as one action repeated
+   * fourteen times - which on a real session produced a 60% repetition rate and
+   * a fabricated "repetition increased 414%" finding.
+   *
+   * Adapters should populate it for any tool whose behavior is driven by an
+   * argument other than a command or path.
+   */
+  target: z.string().optional(),
 });
 
 export const eventResultSchema = z.object({

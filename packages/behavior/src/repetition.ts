@@ -28,8 +28,31 @@ export interface RepeatedSignature {
   readonly indices: readonly number[];
 }
 
+/**
+ * Whether a signature identifies WHAT the action operated on.
+ *
+ * `tool_call|tool:Grep` does not: every Grep in the session shares it, so two
+ * unrelated searches are indistinguishable from the same search run twice. A
+ * signature carrying a command, a path or a target does identify its subject.
+ *
+ * Actions without a discriminator are excluded from the repetition measure
+ * entirely rather than assumed identical. On a real session, assuming they were
+ * identical reported 60% repetition and "repetition increased 414%" for
+ * fourteen genuinely different searches.
+ */
+export function isDiscriminating(signature: string): boolean {
+  return signature.includes("|cmd:") || signature.includes("|path:") || signature.includes("|target:");
+}
+
 export interface RepetitionResult {
+  /**
+   * Actions repetition could actually be measured over. This is the denominator
+   * of the repetition rate - not the total action count, which would include
+   * actions we cannot tell apart.
+   */
   readonly totalActions: number;
+  /** Actions skipped because their signature identifies no subject. */
+  readonly unmeasurableActions: number;
   /** Actions that repeated something already done. Excludes first occurrences. */
   readonly repeatedActions: number;
   /** Failed actions whose signature had already failed before. */
@@ -48,6 +71,7 @@ export interface RepetitionResult {
 
 export const EMPTY_REPETITION: RepetitionResult = {
   totalActions: 0,
+  unmeasurableActions: 0,
   repeatedActions: 0,
   repeatedFailedActions: 0,
   distinctSignatures: 0,
@@ -73,9 +97,18 @@ export function detectRepetition(
   const tallies = new Map<string, Tally>();
   let repeatedActions = 0;
   let repeatedFailedActions = 0;
+  let measurableActions = 0;
+  let unmeasurableActions = 0;
 
   for (const pair of pairs) {
     const signature = pair.action.signature;
+
+    if (!isDiscriminating(signature)) {
+      unmeasurableActions += 1;
+      continue;
+    }
+    measurableActions += 1;
+
     const existing = tallies.get(signature);
 
     const tally: Tally = existing ?? {
@@ -138,7 +171,8 @@ export function detectRepetition(
   );
 
   return {
-    totalActions: pairs.length,
+    totalActions: measurableActions,
+    unmeasurableActions,
     repeatedActions,
     repeatedFailedActions,
     distinctSignatures: tallies.size,

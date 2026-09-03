@@ -174,6 +174,16 @@ export function eventSignature(
     return parts.join("|");
   }
 
+  // What the tool acted on, for tools driven by neither a command nor a path
+  // (a search pattern, a URL). Without it every call to one such tool shares a
+  // signature and reads as repetition.
+  const target = event.tool?.target;
+  if (target !== undefined && target.trim() !== "") {
+    parts.push(`tool:${event.tool?.name ?? "unknown"}`);
+    parts.push(`target:${normalizeWhitespace(target)}`);
+    return parts.join("|");
+  }
+
   if (event.tool?.name !== undefined) {
     parts.push(`tool:${event.tool.name}`);
   }

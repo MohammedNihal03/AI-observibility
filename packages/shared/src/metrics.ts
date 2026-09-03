@@ -144,6 +144,16 @@ export interface BehavioralCounts {
   readonly repeatedFailedActions: number;
   readonly correctionLoops: number;
   readonly successfulCorrectionLoops: number;
+  /**
+   * Actions the repetition measure could actually be taken over.
+   *
+   * The denominator of the repetition rate, supplied by the detector rather
+   * than recounted here. Some actions carry no discriminator - a bare
+   * `tool_call|tool:Grep` cannot be told apart from any other Grep - and are
+   * excluded from the measure instead of being assumed identical. Recounting
+   * the population independently is how the two halves of a ratio drift apart.
+   */
+  readonly measurableActions?: number;
 }
 
 /**

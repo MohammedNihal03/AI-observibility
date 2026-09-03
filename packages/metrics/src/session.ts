@@ -52,9 +52,16 @@ export function computeSessionMetrics(
   const context = computeContextUsage(events, options.context);
   const cost = computeCost(context.tokens, options.cost);
 
+  // The repetition denominator comes from the detector when it supplied one:
+  // it knows which actions were actually distinguishable, and recounting the
+  // population here is how a ratio's two halves come to describe different
+  // things.
   const behavior =
     options.behavior !== undefined
-      ? behavioralRates(options.behavior, countActions(events))
+      ? behavioralRates(
+          options.behavior,
+          options.behavior.measurableActions ?? countActions(events),
+        )
       : { recoveryRate: null, repetitionRate: null, correctionLoopRate: null };
 
   return {

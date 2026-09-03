@@ -220,6 +220,49 @@ describe("eventSignature", () => {
     expect(eventSignature({ type: "user_message" })).toBe("user_message");
   });
 
+  // Regression: without a target, every Grep shared one signature and fourteen
+  // different searches read as one action repeated fourteen times.
+  it("uses the tool target when there is neither command nor path", () => {
+    expect(
+      eventSignature({ type: "tool_call", tool: { name: "Grep", target: "TODO" } }),
+    ).toBe("tool_call|tool:Grep|target:TODO");
+  });
+
+  it("distinguishes two searches for different things", () => {
+    const a = eventSignature({ type: "tool_call", tool: { name: "Grep", target: "TODO" } });
+    const b = eventSignature({ type: "tool_call", tool: { name: "Grep", target: "FIXME" } });
+    expect(a).not.toBe(b);
+  });
+
+  it("prefers a command over a target", () => {
+    const signature = eventSignature({
+      type: "tool_call",
+      tool: { name: "Bash", command: "npm test", target: "ignored" },
+    });
+    expect(signature).toBe("tool_call|tool:Bash|cmd:npm test");
+  });
+
+  it("prefers a path over a target", () => {
+    const signature = eventSignature({
+      type: "file_read",
+      tool: { name: "Read", target: "ignored" },
+      files: { path: "src/a.ts" },
+    });
+    expect(signature).toBe("file_read|tool:Read|path:src/a.ts");
+  });
+
+  it("normalizes whitespace in a target", () => {
+    expect(
+      eventSignature({ type: "search", tool: { name: "Grep", target: "  foo   bar " } }),
+    ).toBe("search|tool:Grep|target:foo bar");
+  });
+
+  it("treats a blank target as absent", () => {
+    expect(eventSignature({ type: "tool_call", tool: { name: "Grep", target: "  " } })).toBe(
+      "tool_call|tool:Grep",
+    );
+  });
+
   it("treats a blank command as absent", () => {
     expect(eventSignature({ type: "tool_call", tool: { name: "Read", command: "   " } })).toBe(
       "tool_call|tool:Read",
