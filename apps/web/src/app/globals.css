@@ -4,29 +4,39 @@
  * Design tokens for the Observatory.
  *
  * BUILD.md section 54: professional developer tooling, readable in dark mode,
- * restrained use of colour. Colour carries meaning here - green/amber/red are
- * reserved for agent state and must never be used decoratively.
+ * restrained use of colour.
+ *
+ * The palette is a single warm accent - clay, taken straight out of the Claude
+ * marks that drift through the background - over a cool charcoal base. Colour
+ * carries meaning: clay is the product, and green/amber/red belong exclusively
+ * to agent state. Nothing here is decorative.
  */
 @theme {
-  --color-canvas: #0a0c10;
-  --color-surface: #11141a;
-  --color-surface-raised: #171b22;
-  --color-border: #232833;
-  --color-border-strong: #303747;
+  --color-canvas: #0b0c0e;
+  --color-canvas-deep: #08090a;
+  --color-surface: #121316;
+  --color-surface-raised: #17191d;
+  --color-border: #24262c;
+  --color-border-strong: #33363f;
 
-  --color-fg: #e8ebf1;
-  --color-fg-muted: #98a1b3;
-  --color-fg-faint: #667085;
+  --color-fg: #ecedee;
+  --color-fg-muted: #9ba1ab;
+  --color-fg-faint: #6b7280;
 
-  --color-accent: #5b9dff;
-  --color-healthy: #3fb950;
-  --color-warn: #d29922;
-  --color-danger: #f85149;
+  /* The clay of the Claude marks. One accent, nothing else. */
+  --color-clay: #d97757;
+  --color-clay-deep: #c96442;
+  --color-clay-soft: #e79a80;
 
-  --font-sans:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono:
-    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  /* State colours. Desaturated so they read as signal, not decoration. */
+  --color-healthy: #4c9f6a;
+  --color-warn: #c3963f;
+  --color-danger: #d0605a;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 html {
@@ -37,12 +47,169 @@ body {
   background-color: var(--color-canvas);
   color: var(--color-fg);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 /* Visible focus for keyboard users (section 55). */
 :focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
+  outline: 2px solid var(--color-clay);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-clay) 35%, transparent);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Glass                                                                     */
+/* ------------------------------------------------------------------------ */
+
+/*
+ * Real frosted glass, not a translucent rectangle: a blurred backdrop, a 1px
+ * light edge along the top where a physical pane would catch the light, and a
+ * darker underside. `--glass-glow` tints the outer bloom; it defaults to
+ * nothing so only the surfaces that earn emphasis actually glow.
+ */
+@utility glass {
+  position: relative;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--color-surface-raised) 72%, transparent),
+    color-mix(in oklab, var(--color-surface) 78%, transparent)
+  );
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid var(--color-border);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    inset 0 -1px 0 rgb(0 0 0 / 0.35),
+    0 24px 60px -30px rgb(0 0 0 / 0.9);
+}
+
+/*
+ * The edge glow. A conic sweep clipped to the 1px border ring, so light appears
+ * to travel around the rim of the pane rather than bleeding outward as a neon
+ * halo. Pure decoration, so it never intercepts a pointer.
+ */
+@utility glass-edge {
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: conic-gradient(
+      from var(--edge-angle, 0deg),
+      transparent 0deg,
+      color-mix(in oklab, var(--color-clay) 70%, transparent) 40deg,
+      transparent 110deg,
+      transparent 250deg,
+      color-mix(in oklab, var(--color-clay-soft) 45%, transparent) 300deg,
+      transparent 350deg
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    opacity: 0.55;
+    pointer-events: none;
+    animation: edge-orbit 14s linear infinite;
+  }
+}
+
+/* A soft clay bloom sitting under a surface. Used sparingly, on the hero only. */
+@utility glass-bloom {
+  &::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    background: radial-gradient(
+      120% 100% at 12% 0%,
+      color-mix(in oklab, var(--color-clay) 16%, transparent),
+      transparent 62%
+    );
+    pointer-events: none;
+  }
+}
+
+@property --edge-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes edge-orbit {
+  to {
+    --edge-angle: 360deg;
+  }
+}
+
+/* ------------------------------------------------------------------------ */
+/* Motion                                                                    */
+/* ------------------------------------------------------------------------ */
+
+/* Staggered entrance. Depth is set per element with `--rise-delay`. */
+@utility rise {
+  animation: rise 0.7s var(--ease-out-expo) both;
+  animation-delay: var(--rise-delay, 0ms);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* The drift applied to the background marks. Transform and opacity only. */
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  33% {
+    transform: translate3d(2.5vw, -3.5vh, 0) rotate(7deg);
+  }
+  66% {
+    transform: translate3d(-1.5vw, 2.5vh, 0) rotate(-5deg);
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.35);
+  }
+}
+
+@keyframes shimmer {
+  to {
+    transform: translate3d(200%, 0, 0);
+  }
+}
+
+@keyframes draw-in {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -52,5 +219,23 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Slim scrollbars inside panels, so a scrolling list does not shout. */
+@utility scroll-slim {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--color-border-strong);
+    border-radius: 999px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
   }
 }

@@ -7,8 +7,7 @@
  * `AgentEvent`s. The analytics packages must never import an adapter, so that
  * adding a new agent never touches the scoring engine.
  *
- * PHASE 1 (current): package identity + build wiring only.
- * PHASE 6  fills in: demo.ts - seeded synthetic sessions (improving / stable /
+ * PHASE 6 (current): demo.ts - seeded synthetic sessions (improving / stable /
  *                    degrading). Clearly labelled as simulated, never as
  *                    observed agent telemetry.
  * PHASE 11 fills in: claude-code.ts - reads local Claude Code session
@@ -23,3 +22,12 @@
  */
 
 export const PACKAGE_NAME = "@observatory/collectors" as const;
+
+export {
+  DEFAULT_DEMO_START,
+  DEMO_ACTION_COUNT,
+  DEMO_SCENARIOS,
+  generateDemoSession,
+  isDemoScenario,
+} from "./demo.js";
+export type { DemoOptions, DemoScenario, DemoSession } from "./demo.js";

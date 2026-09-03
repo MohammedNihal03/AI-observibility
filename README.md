@@ -29,11 +29,12 @@ Under active construction, one phase at a time (see `Build.md`, section 58).
 | 3 — SQLite persistence    | done        |
 | 4 — Metrics engine        | done        |
 | 5 — Behavioral engine     | done        |
-| 6 — Demo generator        | next        |
-| 7–13 — API → adapters     | not started |
+| 6 — Demo generator        | done        |
+| 7 — REST API + WebSocket  | next        |
+| 8–13 — Dashboard→adapters | not started |
 
-The CLI registers all of its commands today, but every command reports honestly that it is not
-implemented yet and names the phase that will implement it.
+`observatory demo` works today. The CLI's other commands report honestly that they are not
+implemented yet and name the phase that will implement them.
 
 ---
 
@@ -93,22 +94,61 @@ npm run dev:web
 
 ```bash
 node cli/dist/index.js --help     # after `npm run build:packages`
+npx tsx cli/src/index.ts --help   # straight from source
 ```
 
-Once Phase 10 lands, `observatory` is available as a command. Planned surface:
+Once Phase 10 lands, `observatory` is available as a command. Surface:
 
 ```
-observatory start        Start the collector and API server
-observatory status       Show the status of the running observatory
-observatory sessions     List recorded sessions
-observatory dashboard    Open the dashboard
-observatory demo         Generate a simulated session
-observatory doctor       Diagnose the local environment and agent integrations
+observatory start        Start the collector and API server        (Phase 10)
+observatory status       Show the status of the running observatory (Phase 10)
+observatory sessions     List recorded sessions                     (Phase 10)
+observatory dashboard    Open the dashboard                         (Phase 10)
+observatory demo         Generate and analyze a simulated session   ✅ works now
+observatory doctor       Diagnose the local environment             (Phase 10)
 ```
 
-`observatory demo --scenario improving|stable|degrading` will generate a deterministic simulated
-session. Simulated data is always labelled as simulated — it is never presented as observed agent
-telemetry.
+## Seeing it work without an agent: `observatory demo`
+
+```bash
+npx tsx cli/src/index.ts demo --scenario improving
+npx tsx cli/src/index.ts demo --scenario stable
+npx tsx cli/src/index.ts demo --scenario degrading
+```
+
+Each scenario generates a synthetic agent session and pushes it through the **real** pipeline —
+validation, normalization, redaction, metrics, behavioral analysis — then prints the verdict and the
+reasons behind it:
+
+```
+  AGENT HEALTH          74 / 100   stable (5/5 components measured)
+  BEHAVIORAL LEARNING   73 / 100   ▲ IMPROVING
+  DEGRADATION           28 / 100
+
+  WINDOW      actions   errors   recovery   repetition   on-goal
+  early          12      60%         0%          33%       75%
+  middle         12      33%       100%          17%       83%
+  recent         12      17%       100%          17%       83%
+
+  WHY THE AGENT IS IMPROVING
+    ✓ 4 successful correction loops
+    ✓ Recovery rate increased 100.0 points
+    ⚠ 1 retry with no change in between
+```
+
+| Scenario    | What the simulated agent does                                             | Verdict     |
+| ----------- | ------------------------------------------------------------------------- | ----------- |
+| `improving` | thrashes, investigates, then recovers from everything                     | ▲ IMPROVING |
+| `stable`    | one failure per stretch, corrected each time, no trend either way         | ● STABLE    |
+| `degrading` | the same test fails seven times; edits stop helping; drifts off the goal  | ▼ DEGRADING |
+
+Other flags: `--seed <value>` (any seed produces the same three verdicts, only the file and command
+names change), `--started-at <iso>`, `--json` for the full analysis, and `--events` for the raw
+events as NDJSON.
+
+**Simulated data is always labelled as simulated.** The session id starts with `demo_`, every event
+carries `metadata.simulated = true`, and the report says so at the top. It is never presented as
+observed agent telemetry.
 
 ---
 

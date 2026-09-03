@@ -284,6 +284,40 @@ describe("degradation score (sections 23, 24)", () => {
     expect(result.score).toBeGreaterThan(0);
   });
 
+  it("does not treat a single isolated failure as a repeated failure", () => {
+    const result = computeDegradation({
+      trends: flatTrends,
+      repetition: {
+        ...EMPTY_REPETITION,
+        // One failure, never retried: a run of one is not a repetition.
+        longestConsecutiveFailureRun: 1,
+        repeatedFailedActions: 0,
+      },
+      loops: EMPTY_CORRECTION_LOOPS,
+      contextPressure: 0.2,
+    });
+    const signal = result.signals.find((entry) => entry.name === "repeatedFailedActions");
+    expect(signal?.severity).toBe(0);
+    expect(signal?.evidence).toBeNull();
+    expect(result.score).toBe(0);
+  });
+
+  it("raises the repeated-failure signal at the second failure of one action", () => {
+    const result = computeDegradation({
+      trends: flatTrends,
+      repetition: {
+        ...EMPTY_REPETITION,
+        longestConsecutiveFailureRun: 2,
+        repeatedFailedActions: 1,
+      },
+      loops: EMPTY_CORRECTION_LOOPS,
+      contextPressure: 0.2,
+    });
+    const signal = result.signals.find((entry) => entry.name === "repeatedFailedActions");
+    expect(signal?.severity).toBeCloseTo(2 / 3, 6);
+    expect(signal?.evidence).toContain("2 times in a row");
+  });
+
   it("gives repeated failures the largest single weight", () => {
     const weights = DEFAULT_SCORING_CONFIG.degradation.weights;
     const largest = Math.max(...Object.values(weights));

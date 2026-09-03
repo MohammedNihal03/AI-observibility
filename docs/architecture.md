@@ -87,6 +87,31 @@ Every score column is nullable, and null means "not computed". A snapshot taken 
 session has no meaningful recovery rate; writing `0` there would render as "0% recovery", which is a
 different and false claim.
 
+## The demo generator
+
+`packages/collectors/src/demo.ts` produces synthetic sessions for the three scenarios of Build.md
+section 34. It is a collector like any other: it emits `AgentEventInput`s and the CLI feeds them
+through validation, normalization, redaction, metrics and behavioral analysis. Nothing about the
+demo path bypasses the engine, so a demo verdict is produced by exactly the code that will judge a
+real session.
+
+Two design decisions are worth knowing about:
+
+**The seed permutes names, never structure.** Which files are touched, which test command runs and
+how many milliseconds elapse are seeded. How many failures occur, whether a file was edited between
+a failure and its retry, and how the three phases differ are fixed in the script. If the seed could
+move the structure, the classification would be luck — instead every seed yields the same three
+verdicts, which is what `cli/src/demo.test.ts` asserts.
+
+**A phase is a window.** The behavioral engine splits a session into three windows by action count,
+so each scenario has three phases of exactly twelve actions. One phase lands in one window, and the
+story the phases tell is the trend the engine measures.
+
+The scenarios were written as behavior, not tuned against the weights. The improving session scores
+74 health and the stable one 82, because an agent that spent its first third thrashing genuinely is
+in worse shape than one that never did — health says how it is doing, learning says which way it is
+going.
+
 ## Dependency graph
 
 ```

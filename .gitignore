@@ -21,3 +21,6 @@ data/
 Thumbs.db
 *.log
 npm-debug.log*
+.agents/skills/brandkit/SKILL.md
+/.agents/skills/design-taste-frontend
+*.md

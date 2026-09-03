@@ -17,8 +17,11 @@
     "dev": "tsx src/index.ts"
   },
   "dependencies": {
+    "@observatory/behavior": "*",
     "@observatory/collectors": "*",
+    "@observatory/metrics": "*",
     "@observatory/shared": "*",
+    "@observatory/telemetry": "*",
     "commander": "^15.0.0"
   }
 }

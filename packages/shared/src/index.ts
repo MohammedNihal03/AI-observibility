@@ -121,6 +121,20 @@ export type {
 } from "./scoring.js";
 
 export type {
+  HealthComponentView,
+  SessionSnapshot,
+  SessionSummary,
+  SnapshotScores,
+  SnapshotSession,
+  SnapshotSignal,
+  SnapshotWindow,
+  StreamMessage,
+  TimelineEntry,
+  TimelineKind,
+  TrendPoint,
+} from "./dashboard.js";
+
+export type {
   BehavioralCounts,
   ContextUsage,
   CostEstimate,

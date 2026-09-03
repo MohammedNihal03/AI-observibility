@@ -63,12 +63,21 @@ export function computeDegradation(
   // Section 23 signal 2, and section 16's core case: the same action failing
   // over and over. Severity saturates at the configured run length (3 by
   // default, matching section 16's worked example).
+  //
+  // A run of ONE is not a repetition: a single failed check is an ordinary
+  // event, and this signal is about an action failing again. Counting it scored
+  // a third of the heaviest degradation weight for any session containing one
+  // isolated failure - a steady session with a single corrected failure read as
+  // 11/100 degraded while its evidence line, which already required a run above
+  // one, said nothing at all.
+  const failureRun =
+    repetition.longestConsecutiveFailureRun > 1 ? repetition.longestConsecutiveFailureRun : 0;
   const repeatedFailureSeverity =
-    repetition.repeatedFailedActions === 0 && repetition.longestConsecutiveFailureRun === 0
+    repetition.repeatedFailedActions === 0 && failureRun === 0
       ? 0
       : Math.min(
           1,
-          Math.max(repetition.longestConsecutiveFailureRun, repetition.repeatedFailedActions) /
+          Math.max(failureRun, repetition.repeatedFailedActions) /
             config.degradation.repeatedFailureSaturation,
         );
 
