@@ -1,38 +1,15 @@
-import { AppShell, SimulatedPill } from "@/components/app-shell";
-import { DashboardBody } from "@/components/dashboard-body";
-import { ScenarioProvider } from "@/components/scenario-provider";
-import { ScenarioSwitcher } from "@/components/scenario-switcher";
-import { loadScenarios } from "@/lib/dashboard-data";
+import { DashboardApp } from "@/components/dashboard-app";
 
 /**
- * PHASE 8 (current): the full dashboard, rendered from sessions the demo
- * generator produces and the real engine scores. There is no API to fetch from
- * yet, and a dashboard that could only be seen with an agent attached could not
- * be built at all.
+ * PHASE 9 (current): the dashboard reads the local API and subscribes to the
+ * session stream, so `observatory demo --stream` fills it in as the events
+ * arrive (BUILD.md sections 31, 61).
  *
- * PHASE 7 swaps `loadScenarios` for a fetch against `/api/sessions`; PHASE 9
- * subscribes to the WebSocket and the status pill earns the word LIVE. Neither
- * touches a component below this file - they all consume `DashboardSession`.
+ * There is no server-side fetch here on purpose. The page is a static shell and
+ * every byte of data arrives over the socket or the API from the client, which
+ * means one code path feeds the first paint and every later update - and no
+ * chance of a server-rendered number disagreeing with a live one.
  */
-
-// The simulated sessions are timestamped relative to the request, so the
-// timeline reads as something that just happened rather than a fixed date in
-// the generator's past.
-export const dynamic = "force-dynamic";
-
-const SESSION_SPAN_MS = 4 * 60 * 1_000;
-
 export default function Page() {
-  const sessions = loadScenarios(new Date(Date.now() - SESSION_SPAN_MS).toISOString());
-
-  return (
-    <ScenarioProvider sessions={sessions}>
-      <AppShell
-        toolbar={sessions.length > 0 ? <ScenarioSwitcher /> : null}
-        status={sessions.length > 0 ? <SimulatedPill /> : null}
-      >
-        <DashboardBody />
-      </AppShell>
-    </ScenarioProvider>
-  );
+  return <DashboardApp />;
 }
