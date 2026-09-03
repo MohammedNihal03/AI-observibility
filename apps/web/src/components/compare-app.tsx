@@ -277,8 +277,16 @@ export function CompareApp() {
     <AppShell toolbar={toolbar}>
       {mode === "sessions" ? (
         <div className="flex flex-col gap-4 sm:gap-5">
+          {/*
+            `relative z-50` is load-bearing. The `rise` entrance animates
+            opacity, which makes every panel its own stacking context, and
+            sibling contexts paint in DOM order regardless of the z-index INSIDE
+            them. The open dropdown's `z-40` therefore lost to a panel further
+            down the page, and the comparison table showed straight through it.
+            Lifting the row that CONTAINS the dropdown is what fixes it.
+          */}
           <div
-            className="rise flex flex-col gap-4 border-b border-border/70 pb-5 sm:flex-row sm:items-end"
+            className="rise relative z-50 flex flex-col gap-4 border-b border-border/70 pb-5 sm:flex-row sm:items-end"
             style={{ "--rise-delay": "0ms" } as CSSProperties}
           >
             <SessionSelect label="Left" sessions={sessions} value={left} onChange={setLeft} />
