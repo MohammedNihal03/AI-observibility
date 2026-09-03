@@ -64,6 +64,10 @@ export function ActivityTimeline({ snapshot, live }: { snapshot: SessionSnapshot
       <ol
         ref={listRef}
         onScroll={onScroll}
+        // Polite, not assertive: new rows are worth announcing but must never
+        // interrupt someone reading the panel above.
+        aria-live={live ? "polite" : "off"}
+        aria-relevant="additions"
         className="scroll-slim mt-6 max-h-[420px] overflow-y-auto pr-2"
         style={{
           maskImage: "linear-gradient(to bottom, #000 92%, transparent 100%)",

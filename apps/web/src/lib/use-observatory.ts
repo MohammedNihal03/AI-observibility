@@ -146,7 +146,18 @@ export function useObservatory(): Observatory {
         }
       } catch (cause: unknown) {
         if (cancelled || controller.signal.aborted) return;
-        if (cause instanceof ApiUnreachableError) setStatus("unreachable");
+        if (cause instanceof ApiUnreachableError) {
+          setStatus("unreachable");
+          return;
+        }
+        // The session is gone - cleared database, or an id that no longer
+        // exists. Drop the stale snapshot and let discovery pick another,
+        // rather than rendering numbers for something that is not there.
+        if (cause instanceof Error && cause.message === "not_found") {
+          setSnapshot(null);
+          setActiveId(null);
+          followLatest.current = true;
+        }
       }
     })();
 

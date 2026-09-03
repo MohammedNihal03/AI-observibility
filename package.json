@@ -26,6 +26,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
+    "observatory": "tsx cli/src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -b && npm run typecheck --workspace @observatory/web"

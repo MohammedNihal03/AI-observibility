@@ -168,6 +168,19 @@ export function createKeywordGoalDriftDetector(): GoalDriftDetector {
         if (keywords.some((keyword) => haystack.includes(keyword))) related += 1;
       }
 
+      // Not one action out of hundreds mentioned the goal. Two explanations
+      // fit: the agent ignored its task entirely, or the goal text is a poor
+      // source of keywords. The second is far more common - real prompts are
+      // typed in a hurry and contain typos - and the detector cannot tell them
+      // apart, so it reports "cannot tell" rather than "completely off task".
+      //
+      // Measured on a real Claude Code session whose first message was
+      // "go witht the ohase 6": every keyword was a typo, nothing matched, and
+      // a fabricated 0% took roughly 18 points off a health score through the
+      // goalAdherence component. Partial matching still measures normally, so
+      // genuine drift within a session is unaffected.
+      if (related === 0) return null;
+
       return related / actions.length;
     },
   };

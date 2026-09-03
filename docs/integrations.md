@@ -82,6 +82,49 @@ Rules for the adapter:
    type and refuses to guess whether a path was read or written, so an adapter that emits only
    `tool_call` reports zero files touched.
 
+### What the adapter emits, verified against a real session
+
+`packages/collectors/src/claude-code.ts`, checked against a 1,500-line transcript of the session
+that wrote it:
+
+| Transcript                                   | Event                                            |
+| -------------------------------------------- | ------------------------------------------------ |
+| `tool_use` Read / NotebookRead               | `file_read` with `files.path`                    |
+| `tool_use` Write                             | `file_write`                                     |
+| `tool_use` Edit / MultiEdit / NotebookEdit   | `file_edit`                                      |
+| `tool_use` Grep / Glob / WebSearch / WebFetch| `search` with `tool.target`                      |
+| `tool_use` Bash / PowerShell / anything else | `tool_call`, command or target attached          |
+| `tool_result`                                | `tool_result`, `is_error` → status, **reported** |
+| `assistant.message.usage`                    | one `model_response` per distinct `message.id`   |
+| user text                                    | `user_message`, first one becomes the goal       |
+
+Measured on that session: 480 assistant lines carried 312 distinct `message.id` values, so per-line
+summing would have overcounted tokens by half again. 332 tool results, 3 of them errors.
+
+Three things that only showed up against real data:
+
+1. **Paths and commands are relativized to the session's `cwd`.** The adapter is the only component
+   that knows it. Without this every signature carries an absolute path, so the same edit on two
+   machines reads as two different actions.
+2. **Commands are capped at 500 characters.** A heredoc is a command line, and
+   `python - <<'EOF' … EOF` carries a source file inside it. Median command on that session: 209
+   characters; longest: 2,243, of embedded Python.
+3. **The first user message is not the goal.** It arrives wrapped in whatever the harness injected —
+   `<ide_selection>`, `<system-reminder>`, slash-command scaffolding. Taken verbatim it produced the
+   goal `<ide_selection>The user selected lines 20 to 20 from AddInvoicePopup.js…`. Injected blocks
+   are stripped, and a message left with nothing falls through to the next one.
+
+### A consequence for goal adherence
+
+Real prompts are typed in a hurry. One session's first message was `go witht the ohase 6`; every
+keyword was a typo, nothing in 396 actions matched, and the keyword detector reported 0% adherence —
+which flowed into health at 15% weight and removed roughly 12 points from the score.
+
+The detector now reports **null** when a goal matches nothing whatsoever, on the grounds that a goal
+matching no action at all is far more often a badly worded goal than an agent that ignored its task,
+and a lexical proxy cannot tell those apart. Partial matching still measures normally, so real drift
+within a session is unaffected.
+
 ### Limitations
 
 - **No context-window maximum is reported.** The transcript states the model but not its limit. Per

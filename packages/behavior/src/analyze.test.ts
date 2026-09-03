@@ -248,14 +248,25 @@ describe("goal drift (section 28)", () => {
     expect(analysis.goalAdherence).toBeNull();
   });
 
-  it("reports 0 when keywords exist but nothing matched", () => {
-    // Distinct from null: the detector ran and found no overlap. Section 24
-    // bounds the damage of a lazily worded goal by giving goal drift only 10%
-    // of the degradation weighting, and the signal is named "possible".
+  it("reports null when keywords exist but nothing whatsoever matched", () => {
+    // Deliberately not 0. A goal that matches no action at all is much more
+    // often a badly worded goal than an agent that ignored its task, and the
+    // lexical detector cannot tell those apart. Section 24 caps the damage on
+    // the degradation side at 10%, but the same figure also feeds health at
+    // 15%, where a fabricated 0 silently removes real points - which is what
+    // it did to a real session whose prompt contained typos.
     const analysis = analyzeSession(goalSession, {
       goal: { text: null, keywords: ["kubernetes"] },
     });
-    expect(analysis.goalAdherence).toBe(0);
+    expect(analysis.goalAdherence).toBeNull();
+  });
+
+  it("still measures partial drift, which is the signal worth having", () => {
+    const analysis = analyzeSession(goalSession, {
+      goal: { text: null, keywords: ["auth", "kubernetes"] },
+    });
+    expect(analysis.goalAdherence).toBeGreaterThan(0);
+    expect(analysis.goalAdherence).toBeLessThan(1);
   });
 
   it("feeds goal adherence into the health score", () => {

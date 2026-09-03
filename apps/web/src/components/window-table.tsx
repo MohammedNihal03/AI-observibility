@@ -32,11 +32,17 @@ export function WindowTable({ snapshot }: { snapshot: SessionSnapshot }) {
           numeric columns into a phone's width. */}
       <div className="scroll-slim mt-6 -mx-1 overflow-x-auto px-1">
         <table className="w-full min-w-[380px] border-collapse text-left">
+          <caption className="sr-only">
+            Error, recovery, repetition and goal-adherence rates for the early, middle and recent
+            thirds of the session
+          </caption>
           <thead>
             <tr className="text-[10px] uppercase tracking-[0.14em] text-fg-faint">
-              <th className="pb-3 font-medium">Window</th>
+              <th scope="col" className="pb-3 font-medium">
+                Window
+              </th>
               {COLUMNS.map((column) => (
-                <th key={column.key} className="pb-3 text-right font-medium">
+                <th key={column.key} scope="col" className="pb-3 text-right font-medium">
                   {column.label}
                 </th>
               ))}

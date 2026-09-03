@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { buildProgram, NotImplementedYetError } from "./program.js";
+import { buildProgram } from "./program.js";
 
-const EXPECTED_COMMANDS = ["start", "status", "sessions", "dashboard", "demo", "doctor"];
-/** Everything except `demo`, which Phase 6 implemented. */
-const PLANNED_COMMANDS = EXPECTED_COMMANDS.filter((command) => command !== "demo");
+/**
+ * The command surface of BUILD.md section 33, plus `import`.
+ *
+ * These drive the program the way a shell does, but with the output writer and
+ * commander's exit behaviour injected, so nothing here spawns a process or
+ * touches a real server.
+ */
 
-function run(args: string[]): string[] {
-  return capture(args).out;
-}
+const SECTION_33_COMMANDS = ["start", "status", "sessions", "dashboard", "demo", "doctor"];
 
 function capture(args: string[]): { out: string[]; err: string[] } {
   const out: string[] = [];
@@ -27,21 +29,34 @@ function capture(args: string[]): { out: string[]; err: string[] } {
   return { out, err };
 }
 
+function run(args: string[]): string[] {
+  return capture(args).out;
+}
+
 describe("observatory CLI", () => {
   it("registers every command required by BUILD.md section 33", () => {
-    const names = buildProgram()
-      .commands.map((command) => command.name())
-      .sort();
-    expect(names).toEqual([...EXPECTED_COMMANDS].sort());
-  });
-
-  it("reports honestly that a command is not implemented yet", () => {
-    for (const command of PLANNED_COMMANDS) {
-      expect(() => run([command])).toThrow(NotImplementedYetError);
+    const names = buildProgram().commands.map((command) => command.name());
+    for (const command of SECTION_33_COMMANDS) {
+      expect(names).toContain(command);
     }
   });
 
-  it("runs each demo scenario", () => {
+  it("adds `import`, which section 33 does not specify", () => {
+    // Reading a transcript an agent already wrote is a different job from the
+    // six commands the spec lists, so it is an addition rather than a rename.
+    expect(buildProgram().commands.map((command) => command.name())).toContain("import");
+  });
+
+  it("describes every command it offers", () => {
+    for (const command of buildProgram().commands) {
+      expect(command.description().length).toBeGreaterThan(10);
+      expect(command.description()).not.toMatch(/not implemented/i);
+    }
+  });
+});
+
+describe("demo", () => {
+  it("runs each scenario", () => {
     for (const scenario of ["improving", "stable", "degrading"]) {
       const output = run(["demo", "--scenario", scenario]).join("\n");
       expect(output).toContain("SIMULATED DATA");
@@ -81,5 +96,17 @@ describe("observatory CLI", () => {
     const args = ["demo", "--seed", "fixed", "--started-at", "2026-05-01T08:00:00.000Z", "--json"];
     expect(run(args)).toEqual(run(args));
     expect(run(args).join("\n")).toContain("2026-05-01T08:00:00.000Z");
+  });
+});
+
+describe("dashboard", () => {
+  it("prints the URL instead of opening a browser when asked", () => {
+    expect(run(["dashboard", "--print"]).join("")).toBe("http://127.0.0.1:4001");
+  });
+
+  it("accepts an explicit URL", () => {
+    expect(run(["dashboard", "--print", "--url", "http://localhost:9999"]).join("")).toBe(
+      "http://localhost:9999",
+    );
   });
 });

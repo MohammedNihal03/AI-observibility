@@ -79,7 +79,14 @@ const TRANSCRIPT: readonly string[] = [
   user([{ type: "tool_result", tool_use_id: "call_a", content: "file contents here" }], 4),
   assistant(
     "msg_2",
-    [{ type: "tool_use", id: "call_b", name: "Bash", input: { command: "npm test", description: "run tests" } }],
+    [
+      {
+        type: "tool_use",
+        id: "call_b",
+        name: "Bash",
+        input: { command: "npm test", description: "run tests" },
+      },
+    ],
     { ...USAGE, cache_read_input_tokens: 31_000 },
     5,
   ),
@@ -150,17 +157,13 @@ describe("parseTranscript", () => {
       .filter((event) => event.tool !== undefined)
       .map((event) => `${event.tool?.name}:${event.type}`);
 
-    expect(types).toEqual([
-      "Read:file_read",
-      "Bash:tool_call",
-      "Edit:file_edit",
-      "Bash:tool_call",
-    ]);
+    expect(types).toEqual(["Read:file_read", "Bash:tool_call", "Edit:file_edit", "Bash:tool_call"]);
   });
 
   it("carries the path and the command, and never their contents", () => {
     const read = result.events.find((event) => event.type === "file_read");
-    expect(read?.files?.path).toBe("/repo/src/auth.ts");
+    // Relative to the session's cwd, so the signature is portable.
+    expect(read?.files?.path).toBe("src/auth.ts");
 
     const bash = result.events.find((event) => event.tool?.command !== undefined);
     expect(bash?.tool?.command).toBe("npm test");
@@ -170,6 +173,62 @@ describe("parseTranscript", () => {
     expect(serialized).not.toContain("file contents here");
     expect(serialized).not.toContain("1 failed");
     expect(serialized).not.toContain("old_string");
+  });
+
+  it("bounds a command so a heredoc cannot smuggle a file into telemetry", () => {
+    const payload = `cat > secrets.txt <<'EOF'\n${"SECRET-LINE\n".repeat(200)}EOF`;
+    const parsed = parseTranscript([
+      assistant(
+        "msg_h",
+        [{ type: "tool_use", id: "h1", name: "Bash", input: { command: payload } }],
+        null,
+        1,
+      ),
+    ]);
+
+    const command = parsed.events[0]?.tool?.command ?? "";
+    expect(command.length).toBeLessThan(600);
+    expect(command).toContain("truncated");
+    expect(command).toContain(String(payload.length));
+    // Only the head survives; the bulk of the heredoc does not travel.
+    expect((command.match(/SECRET-LINE/gu) ?? []).length).toBeLessThan(50);
+  });
+
+  it("keeps two different long commands distinguishable after truncation", () => {
+    const prefix = "x".repeat(600);
+    const parsed = parseTranscript([
+      assistant(
+        "msg_t",
+        [
+          { type: "tool_use", id: "t1", name: "Bash", input: { command: `${prefix}A` } },
+          { type: "tool_use", id: "t2", name: "Bash", input: { command: `${prefix}BB` } },
+        ],
+        null,
+        1,
+      ),
+    ]);
+
+    const [first, second] = parsed.events.map((event) => event.tool?.command);
+    expect(first).not.toBe(second);
+  });
+
+  it("strips harness-injected context out of the goal", () => {
+    const parsed = parseTranscript([
+      user(
+        "<ide_selection>The user selected lines 20 to 20 from AddInvoicePopup.js</ide_selection>" +
+          "Fix the invoice total rounding",
+        0,
+      ),
+    ]);
+    expect(parsed.session.goal).toBe("Fix the invoice total rounding");
+  });
+
+  it("falls through to the next message when one is only injected context", () => {
+    const parsed = parseTranscript([
+      user("<system-reminder>background note</system-reminder>", 0),
+      user("Actually fix the auth refresh", 1),
+    ]);
+    expect(parsed.session.goal).toBe("Actually fix the auth refresh");
   });
 
   it("reports failure from is_error, as a fact rather than an inference", () => {

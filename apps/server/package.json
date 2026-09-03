@@ -4,7 +4,7 @@
   "private": true,
   "description": "Local-first Fastify API + WebSocket hub for the AI Agent Observatory.",
   "type": "module",
-  "main": "./dist/index.js",
+  "main": "./dist/api.js",
   "scripts": {
     "build": "tsc -b",
     "clean": "tsc -b --clean",
@@ -30,5 +30,12 @@
     "@types/better-sqlite3": "^9.6.0",
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.23.13"
+  },
+  "types": "./dist/api.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/api.d.ts",
+      "default": "./dist/api.js"
+    }
   }
 }

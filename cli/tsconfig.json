@@ -11,6 +11,7 @@
     { "path": "../packages/telemetry" },
     { "path": "../packages/metrics" },
     { "path": "../packages/behavior" },
-    { "path": "../packages/collectors" }
+    { "path": "../packages/collectors" },
+    { "path": "../apps/server" }
   ]
 }

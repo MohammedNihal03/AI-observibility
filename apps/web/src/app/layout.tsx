@@ -8,9 +8,15 @@ import { BackgroundField } from "@/components/background-field";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AI Agent Observatory",
+  title: {
+    default: "AI Agent Observatory",
+    template: "%s · AI Agent Observatory",
+  },
   description:
     "Local-first behavioral observability for AI coding agents. Measures observable agent behavior, not model weights.",
+  applicationName: "AI Agent Observatory",
+  // Local-only tool: there is nothing to index and no link to unfurl.
+  robots: { index: false, follow: false },
 };
 
 export const viewport: Viewport = {

@@ -33,12 +33,15 @@ Under active construction, one phase at a time (see `Build.md`, section 58).
 | 7 — REST API + WebSocket  | done        |
 | 8 — Dashboard             | done        |
 | 9 — Real-time dashboard   | done        |
-| 10 — CLI                  | next        |
-| 11–13 — Adapters, polish  | not started |
+| 10 — CLI                  | done        |
+| 11 — Claude Code adapter  | done        |
+| 12 — Codex adapter        | not started |
+| 13 — Polish               | done        |
 
-The dashboard, the API and `observatory demo` all work today. The CLI's remaining commands
-(`start`, `status`, `sessions`, `dashboard`, `doctor`) report honestly that they are not implemented
-yet and name the phase that will implement them.
+Everything works except the Codex adapter: the API, the live dashboard, the full CLI, and
+`observatory import`, which observes **real Claude Code sessions**. Codex sessions are readable in
+principle — `observatory doctor` says so rather than pretending otherwise — but nothing reads them
+yet.
 
 ---
 
@@ -101,15 +104,43 @@ node cli/dist/index.js --help     # after `npm run build:packages`
 npx tsx cli/src/index.ts --help   # straight from source
 ```
 
-Once Phase 10 lands, `observatory` is available as a command. Surface:
+```
+observatory start       Start the local API server
+observatory status      What the Observatory is doing right now
+observatory sessions    List recorded sessions with their scores
+observatory dashboard   Open the dashboard in a browser
+observatory demo        Generate and analyze a simulated session
+observatory import      Observe a real Claude Code session
+observatory doctor      Check the local environment and integrations
+```
+
+To type `observatory` rather than the whole path:
+
+```bash
+npm run build:packages && npm link --workspace @observatory/cli
+```
+
+`npm run observatory -- <command>` works without linking anything.
+
+### A first run
+
+```bash
+observatory start          # terminal 1: the API
+npm run dev:web            # terminal 2: the dashboard
+observatory import         # terminal 3: observe your last Claude Code session
+observatory dashboard      # open it
+```
+
+`observatory doctor` reports on all of the above at once, including whether Claude Code has written
+any transcripts to read:
 
 ```
-observatory start        Start the collector and API server        (Phase 10)
-observatory status       Show the status of the running observatory (Phase 10)
-observatory sessions     List recorded sessions                     (Phase 10)
-observatory dashboard    Open the dashboard                         (Phase 10)
-observatory demo         Generate and analyze a simulated session   ✅ works now
-observatory doctor       Diagnose the local environment             (Phase 10)
+  ✓ Node.js           v22.21.0 on win32 x64
+  ✓ API server        http://127.0.0.1:4000 · 2 sessions
+  ✓ Claude Code       104 sessions, newest just now
+  ⚠ Codex             adapter not implemented (Phase 12)
+  ✓ Scoring config    weights valid · 5 health components
+  ✓ Secret redaction  12 credential formats recognised
 ```
 
 ## Seeing it work without an agent: `observatory demo`
@@ -168,6 +199,58 @@ events as NDJSON.
 **Simulated data is always labelled as simulated.** The session id starts with `demo_`, every event
 carries `metadata.simulated = true`, and both the report and the dashboard say so. It is never
 presented as observed agent telemetry.
+
+---
+
+## Observing a real agent: `observatory import`
+
+Claude Code appends a JSONL transcript of every session to
+`~/.claude/projects/<project>/<sessionId>.jsonl` as it works. The adapter reads it — no hook, no
+configuration, no cooperation from the agent required.
+
+```bash
+npx tsx cli/src/index.ts import --list          # what is on this machine
+npx tsx cli/src/index.ts import                 # the newest session
+npx tsx cli/src/index.ts import --session 5f80  # a specific one (prefix is enough)
+npx tsx cli/src/index.ts import --watch         # keep following a session as it runs
+```
+
+Re-running is safe: the server is asked how many events it already holds and only the remainder is
+sent, which is also how `--watch` appends.
+
+### What leaves your machine: nothing
+
+The import sends the **shape** of the work, never its content:
+
+| Sent                                             | Not sent                                        |
+| ------------------------------------------------ | ----------------------------------------------- |
+| Which tool ran, and its call id                  | Prompt text, assistant replies, thinking blocks |
+| The file path that was read or edited            | File contents, diffs, `old_string`/`new_string` |
+| The command line (capped at 500 characters)      | Command output, stdout, stderr                  |
+| Success or failure, from Claude Code's `is_error`| Error messages                                  |
+| Token counts per API response                    | —                                               |
+
+The command cap is not arbitrary. A heredoc is a command line too: measured on a real session, the
+median command was 209 characters but the longest was 2,243 characters of embedded Python. Commands
+are truncated with their original length appended, so long ones stay distinguishable from each other
+without carrying a file inside them.
+
+Everything still goes through redaction before storage, but the cheapest way not to leak a secret is
+not to carry it.
+
+### What is real, and what stays unknown
+
+| Measure                          | With Claude Code                                        |
+| -------------------------------- | ------------------------------------------------------- |
+| Failures, recovery, correction loops | **Real.** `is_error` makes failure deterministic     |
+| Files read / modified            | **Real**, counted as distinct paths by semantic type     |
+| Tokens                           | **Real**, deduplicated by `message.id`                   |
+| Repetition, health, learning      | **Real** — the same engine, on real events               |
+| Context utilization              | **Unknown.** Claude Code never states the model's limit  |
+
+Sub-agent work (`isSidechain`) is left out of the parent session by default: a subagent is a
+different agent, and blending its tool calls into the parent's would average two behaviours into one
+score. `--include-sidechains` opts in.
 
 ---
 

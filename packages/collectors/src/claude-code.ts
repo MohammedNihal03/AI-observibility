@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { basename, join } from "node:path";
 
 import type { AgentEventInput, AgentEventType } from "@observatory/shared";
+import { normalizeCommand, normalizePath } from "@observatory/telemetry";
 
 /**
  * The Claude Code adapter (BUILD.md Phase 11, sections 43-45).
@@ -59,6 +60,27 @@ const TOOL_EVENT_TYPES: Record<string, AgentEventType> = {
   WebSearch: "search",
   WebFetch: "search",
 };
+
+/**
+ * Longest command carried out of a transcript.
+ *
+ * A command line is normally an action's identity - `npm test`, `git status` -
+ * and the whole point of keeping it. But a heredoc is also a command line, and
+ * `python - <<'EOF' … EOF` carries an entire source file inside it. Measured on
+ * a real session: median command 209 characters, but 40 of 140 ran past 400 and
+ * the longest was 2,243 characters of embedded Python.
+ *
+ * Truncating bounds what an agent can smuggle into telemetry through its own
+ * shell. The original length is appended so two different long commands still
+ * produce different signatures, and so a reader can see that trimming happened
+ * rather than wondering why a command looks half-finished.
+ */
+const MAX_COMMAND_LENGTH = 500;
+
+function boundedCommand(command: string): string {
+  if (command.length <= MAX_COMMAND_LENGTH) return command;
+  return `${command.slice(0, MAX_COMMAND_LENGTH)} … [truncated, ${command.length} chars]`;
+}
 
 /** Where each tool keeps the thing it acted on, for the action signature. */
 const TOOL_TARGET_KEYS: readonly string[] = [
@@ -139,6 +161,39 @@ interface Mutable {
   endedAt: string | null;
 }
 
+/**
+ * Blocks the harness injects into a user message that the user did not type.
+ *
+ * IDE selections, system reminders and slash-command scaffolding all arrive
+ * inside the `user` line. Taking the first user message verbatim as the session
+ * goal produced goals like `<ide_selection>The user selected lines 20 to 20 of
+ * AddInvoicePopup.js…`, which then drove goal-drift scoring against a filename
+ * the user never mentioned. Stripped before the goal is derived.
+ */
+const INJECTED_BLOCKS =
+  /<(ide_selection|system-reminder|command-name|command-message|command-args|local-command-stdout|local-command-stderr|user-prompt-submit-hook)>[\s\S]*?<\/\1>/giu;
+
+/** Shortest remaining text that is worth treating as a stated goal. */
+const MIN_GOAL_LENGTH = 8;
+
+/**
+ * The user's actual words, with injected context removed.
+ *
+ * Returns null when nothing is left, so the goal falls through to the next
+ * message rather than latching onto scaffolding.
+ */
+export function extractGoalText(raw: string): string | null {
+  const cleaned = raw
+    .replace(INJECTED_BLOCKS, " ")
+    // An unclosed injected block (truncated mid-write) leaves a dangling tag.
+    .replace(/<\/?[a-z][a-z0-9-]*>/giu, " ")
+    .replace(/^Caveat:[\s\S]*?<\/?[a-z-]+>/iu, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+
+  return cleaned.length < MIN_GOAL_LENGTH ? null : cleaned;
+}
+
 /** Pulls the user's own words out of a `user` line, ignoring tool results. */
 function userText(message: Record<string, unknown> | null): string | null {
   if (message === null) return null;
@@ -164,13 +219,25 @@ function userText(message: Record<string, unknown> | null): string | null {
  * results exactly, rather than by proximity. Claude Code issues tool calls in
  * parallel, and nearest-preceding pairing swaps results within a batch.
  */
-function toolEvent(block: Record<string, unknown>, timestamp: string): AgentEventInput | null {
+function toolEvent(
+  block: Record<string, unknown>,
+  timestamp: string,
+  cwd: string | null,
+): AgentEventInput | null {
   const name = asString(block["name"]);
   if (name === undefined) return null;
 
   const input = asRecord(block["input"]) ?? {};
   const callId = asString(block["id"]);
   const type = TOOL_EVENT_TYPES[name] ?? "tool_call";
+
+  // Paths and commands are made relative to the session's working directory
+  // here, using the pipeline's own normalizer. The adapter is the only place
+  // that knows the cwd - the server never sees it - and without this every
+  // signature carries an absolute path, so the same edit made on two machines
+  // reads as two different actions and the timeline shows
+  // `c:/Users/.../apps/web/src/x.tsx` where `apps/web/src/x.tsx` was meant.
+  const normalizeOptions = cwd === null ? {} : { cwd };
 
   const event: AgentEventInput = {
     source: "claude_code",
@@ -182,13 +249,17 @@ function toolEvent(block: Record<string, unknown>, timestamp: string): AgentEven
 
   const path = asString(input["file_path"]) ?? asString(input["notebook_path"]);
   if (path !== undefined) {
-    event.files = { path };
+    event.files = { path: normalizePath(path, normalizeOptions) };
   }
 
   // Bash and PowerShell are the only tools whose subject is a command line.
   const command = asString(input["command"]);
   if (command !== undefined) {
-    event.tool = { ...event.tool, name, command };
+    event.tool = {
+      ...event.tool,
+      name,
+      command: boundedCommand(normalizeCommand(command, normalizeOptions)),
+    };
   } else if (path === undefined) {
     // Neither a command nor a path: find something that identifies WHAT this
     // call acted on, or repetition detection cannot tell two of them apart.
@@ -313,7 +384,10 @@ export function parseTranscript(
 
       const text = userText(message);
       if (text !== null) {
-        state.goal ??= text.slice(0, maxGoal);
+        if (state.goal === null) {
+          const goal = extractGoalText(text);
+          if (goal !== null) state.goal = goal.slice(0, maxGoal);
+        }
         events.push({ source: "claude_code", type: "user_message", timestamp });
         emitted = true;
       }
@@ -366,7 +440,7 @@ export function parseTranscript(
       for (const item of Array.isArray(message?.["content"]) ? message["content"] : []) {
         const block = asRecord(item);
         if (block === null || block["type"] !== "tool_use") continue;
-        const event = toolEvent(block, timestamp);
+        const event = toolEvent(block, timestamp, state.cwd);
         if (event !== null) {
           events.push(event);
           emitted = true;

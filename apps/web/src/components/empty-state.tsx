@@ -17,6 +17,17 @@ import { Panel } from "./ui";
  * empty state ever shipped, and this one should not look like it.
  */
 
+const COMMANDS = [
+  {
+    command: "observatory import",
+    detail: "Reads a real Claude Code session from its local transcript.",
+  },
+  {
+    command: "observatory demo --scenario improving --stream",
+    detail: "Generates a simulated session and streams it in live.",
+  },
+] as const;
+
 const PREVIEW = [
   {
     label: "Agent health",
@@ -57,21 +68,28 @@ export function EmptyState() {
         </h1>
 
         <p className="mt-4 max-w-[52ch] text-sm leading-relaxed text-fg-muted">
-          Start a Claude Code or Codex session with the collector running, or generate a simulated
-          one to see the dashboard with data in it.
+          Observe a Claude Code session you have already run, or generate a simulated one to see the
+          dashboard with data in it.
         </p>
 
-        <div className="mt-8 flex items-center gap-3 rounded-2xl border border-border bg-canvas/60 px-4 py-3.5">
-          <span aria-hidden="true" className="select-none font-mono text-sm text-clay">
-            $
-          </span>
-          <code className="scroll-slim overflow-x-auto whitespace-nowrap font-mono text-[13px] text-fg">
-            observatory demo --scenario improving --stream
-          </code>
-          <ArrowUpRight className="ml-auto size-3.5 shrink-0 text-fg-faint" />
-        </div>
+        <ul className="mt-8 flex flex-col gap-3">
+          {COMMANDS.map((entry) => (
+            <li key={entry.command}>
+              <div className="flex items-center gap-3 rounded-2xl border border-border bg-canvas/60 px-4 py-3.5">
+                <span aria-hidden="true" className="select-none font-mono text-sm text-clay">
+                  $
+                </span>
+                <code className="scroll-slim overflow-x-auto whitespace-nowrap font-mono text-[13px] text-fg">
+                  {entry.command}
+                </code>
+                <ArrowUpRight className="ml-auto size-3.5 shrink-0 text-fg-faint" />
+              </div>
+              <p className="mt-1.5 pl-4 text-[11px] text-fg-faint">{entry.detail}</p>
+            </li>
+          ))}
+        </ul>
 
-        <p className="mt-3 text-[11px] leading-relaxed text-fg-faint">
+        <p className="mt-6 text-[11px] leading-relaxed text-fg-faint">
           Simulated sessions are labelled as simulated everywhere they appear. They are never
           presented as observed agent telemetry.
         </p>

@@ -1,24 +1,30 @@
-import { createApp } from "./app.js";
-import { loadConfig } from "./config.js";
+import { startServer } from "./start.js";
 
+/**
+ * The server binary. Everything it does lives in `start.ts`, so that
+ * `observatory start` can do the same thing without spawning a process.
+ */
 async function main(): Promise<void> {
-  const config = loadConfig();
-  const app = createApp({ config, logger: true });
+  const server = await startServer({ logger: true });
 
-  const shutdown = async (signal: string): Promise<void> => {
-    app.log.info({ signal }, "shutting down");
-    await app.close();
-    process.exit(0);
+  const shutdown = (signal: string): void => {
+    server.app.log.info({ signal }, "shutting down");
+    void server.close().then(() => {
+      process.exit(0);
+    });
   };
 
-  process.on("SIGINT", () => void shutdown("SIGINT"));
-  process.on("SIGTERM", () => void shutdown("SIGTERM"));
+  process.on("SIGINT", () => {
+    shutdown("SIGINT");
+  });
+  process.on("SIGTERM", () => {
+    shutdown("SIGTERM");
+  });
 
-  await app.listen({ host: config.host, port: config.port });
-  app.log.info(`observatory server listening on http://${config.host}:${config.port}`);
+  server.app.log.info(`observatory server listening on ${server.url}`);
 }
 
 main().catch((error: unknown) => {
-  console.error("failed to start observatory server:", error);
+  console.error(error instanceof Error ? error.message : error);
   process.exit(1);
 });

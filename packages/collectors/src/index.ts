@@ -34,6 +34,7 @@ export type { DemoOptions, DemoScenario, DemoSession } from "./demo.js";
 
 export {
   CLAUDE_CODE_HOME_DIR,
+  extractGoalText,
   findTranscripts,
   parseTranscript,
   readTranscript,

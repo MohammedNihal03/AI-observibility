@@ -141,7 +141,21 @@ export function PerformanceChart({ snapshot }: { snapshot: SessionSnapshot }) {
         </span>
       </div>
 
-      <div ref={containerRef} className="mt-6 w-full" style={{ height: CHART_HEIGHT }}>
+      {/* The chart is a picture of numbers that exist in text elsewhere on the
+          page, so it is hidden from assistive tech and summarised instead. */}
+      <p className="sr-only">
+        {first === null || last === null
+          ? "Health could not be measured across this session."
+          : `Health moved from ${first} to ${last} across ${data.length} measurements, ` +
+            `spanning ${data[data.length - 1]?.actions ?? 0} actions.`}
+      </p>
+
+      <div
+        ref={containerRef}
+        aria-hidden="true"
+        className="mt-6 w-full"
+        style={{ height: CHART_HEIGHT }}
+      >
         {width === 0 ? (
           <div
             className="size-full rounded-2xl border border-border/60"

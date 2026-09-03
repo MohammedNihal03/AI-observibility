@@ -1,4 +1,9 @@
-import type { AgentEventInput, SessionRecord, SessionSnapshot } from "@observatory/shared";
+import type {
+  AgentEventInput,
+  SessionRecord,
+  SessionSnapshot,
+  SessionSummary,
+} from "@observatory/shared";
 
 /**
  * A minimal client for the local API (BUILD.md section 32).
@@ -56,7 +61,14 @@ async function request<T>(server: string, path: string, init?: RequestInit): Pro
 
 export interface ApiClient {
   readonly server: string;
-  health(): Promise<{ status: string; version: string; database: { sessions: number } }>;
+  health(): Promise<{
+    status: string;
+    version: string;
+    contractVersion: number;
+    uptimeSeconds: number;
+    subscribers: number;
+    database: { location: string; sessions: number };
+  }>;
   createSession(input: Record<string, unknown>): Promise<SessionRecord>;
   /** Throws if the session is unknown - used to decide create-or-append. */
   getSession(sessionId: string): Promise<SessionSnapshot>;
@@ -65,7 +77,7 @@ export interface ApiClient {
     sessionId: string,
     events: readonly AgentEventInput[],
   ): Promise<{ accepted: number; redactions: number }>;
-  listSessions(): Promise<{ sessions: { id: string; state: string; health: number | null }[] }>;
+  listSessions(): Promise<{ sessions: SessionSummary[] }>;
   endSession(sessionId: string): Promise<SessionRecord>;
 }
 

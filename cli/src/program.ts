@@ -3,37 +3,10 @@ import { OBSERVATORY_VERSION } from "@observatory/shared";
 import { Command, InvalidArgumentError, Option } from "commander";
 
 import { DEFAULT_SERVER } from "./api.js";
+import { doctorReport, openDashboard, sessionsReport, statusReport } from "./commands.js";
 import { demoSummary, formatDemoReport, runDemo } from "./demo.js";
 import { importClaudeCodeSession, listSessions } from "./import.js";
 import { streamDemo } from "./stream.js";
-
-/** Phase in which each command becomes functional (BUILD.md section 58). */
-const PLANNED: Record<string, string> = {
-  start: "Phase 10 (needs the API from Phase 7)",
-  status: "Phase 10 (needs the API from Phase 7)",
-  sessions: "Phase 10 (needs persistence from Phase 3)",
-  dashboard: "Phase 10 (needs the dashboard from Phase 8)",
-  doctor: "Phase 10",
-};
-
-export class NotImplementedYetError extends Error {
-  constructor(readonly command: string) {
-    super(
-      `\`observatory ${command}\` is not implemented yet - scheduled for ${PLANNED[command] ?? "a later phase"}.\n` +
-        `The command surface is wired up so that phases can land one at a time without changing the CLI contract.`,
-    );
-    this.name = "NotImplementedYetError";
-  }
-}
-
-function planned(program: Command, name: string, description: string): Command {
-  return program
-    .command(name)
-    .description(`${description} [not implemented yet - ${PLANNED[name]}]`)
-    .action(() => {
-      throw new NotImplementedYetError(name);
-    });
-}
 
 interface DemoCommandOptions {
   readonly scenario: string;
@@ -44,6 +17,28 @@ interface DemoCommandOptions {
   readonly stream?: boolean;
   readonly server: string;
   readonly speed: string;
+}
+
+interface StartCommandOptions {
+  readonly port?: string;
+  readonly host?: string;
+  readonly quiet?: boolean;
+}
+
+interface SessionsCommandOptions {
+  readonly server: string;
+  readonly json?: boolean;
+  readonly limit?: string;
+}
+
+interface DashboardCommandOptions {
+  readonly url?: string;
+  readonly print?: boolean;
+}
+
+interface DoctorCommandOptions {
+  readonly server: string;
+  readonly dashboard?: string;
 }
 
 interface ImportCommandOptions {
@@ -77,10 +72,87 @@ export function buildProgram(options: ProgramOptions = {}): Command {
     )
     .version(OBSERVATORY_VERSION, "-v, --version");
 
-  planned(program, "start", "Start the collector and API server.");
-  planned(program, "status", "Show the status of the running observatory.");
-  planned(program, "sessions", "List recorded sessions.");
-  planned(program, "dashboard", "Open the dashboard in a browser.");
+  program
+    .command("start")
+    .description("Start the local API server. Runs until interrupted.")
+    .option("-p, --port <port>", "port to listen on")
+    .option("--host <host>", "interface to bind (loopback by default)")
+    .option("--quiet", "suppress request logging")
+    .action(async (commandOptions: StartCommandOptions) => {
+      // Imported lazily: the server pulls in SQLite and Fastify, and
+      // `observatory sessions` should not pay for them.
+      const { startServer } = await import("@observatory/server");
+
+      const port =
+        commandOptions.port === undefined ? undefined : Number.parseInt(commandOptions.port, 10);
+      if (port !== undefined && (!Number.isInteger(port) || port < 1 || port > 65535)) {
+        throw new InvalidArgumentError(`--port must be a number between 1 and 65535`);
+      }
+
+      const server = await startServer({
+        logger: commandOptions.quiet !== true,
+        ...(port !== undefined ? { port } : {}),
+        ...(commandOptions.host !== undefined ? { host: commandOptions.host } : {}),
+      });
+
+      out(`Observatory API listening on ${server.url}`);
+      out(`Database ${server.app.database.file}`);
+      out("");
+      out("  observatory demo --stream    generate a simulated session");
+      out("  observatory import           observe a real Claude Code session");
+      out("  observatory dashboard        open the dashboard");
+      out("");
+      out("Press Ctrl+C to stop.");
+
+      // Resolving here would end the process and take the server with it.
+      await new Promise<void>((resolve) => {
+        const stop = (): void => {
+          out("\nStopping.");
+          void server.close().then(resolve);
+        };
+        process.once("SIGINT", stop);
+        process.once("SIGTERM", stop);
+      });
+    });
+
+  program
+    .command("status")
+    .description("Show what the local Observatory is doing.")
+    .option("--server <url>", "Observatory API", DEFAULT_SERVER)
+    .action(async (commandOptions: { server: string }) => {
+      out(await statusReport({ server: commandOptions.server }));
+    });
+
+  program
+    .command("sessions")
+    .description("List recorded sessions with their headline scores.")
+    .option("--server <url>", "Observatory API", DEFAULT_SERVER)
+    .option("--json", "print the raw list as JSON")
+    .option("-n, --limit <count>", "how many to show")
+    .action(async (commandOptions: SessionsCommandOptions) => {
+      const limit =
+        commandOptions.limit === undefined ? undefined : Number.parseInt(commandOptions.limit, 10);
+      out(
+        await sessionsReport({
+          server: commandOptions.server,
+          ...(commandOptions.json === true ? { json: true } : {}),
+          ...(limit !== undefined && Number.isInteger(limit) ? { limit } : {}),
+        }),
+      );
+    });
+
+  program
+    .command("dashboard")
+    .description("Open the dashboard in a browser.")
+    .option("--url <url>", "dashboard address")
+    .option("--print", "print the URL instead of opening it")
+    .action((commandOptions: DashboardCommandOptions) => {
+      const url = openDashboard({
+        ...(commandOptions.url !== undefined ? { url: commandOptions.url } : {}),
+        ...(commandOptions.print === true ? { print: true } : {}),
+      });
+      out(commandOptions.print === true ? url : `Opening ${url}`);
+    });
 
   program
     .command("demo")
@@ -222,7 +294,21 @@ export function buildProgram(options: ProgramOptions = {}): Command {
       out("Open the dashboard at http://127.0.0.1:4001 to see it.");
     });
 
-  planned(program, "doctor", "Diagnose the local environment and agent integrations.");
+  program
+    .command("doctor")
+    .description("Check the local environment and agent integrations.")
+    .option("--server <url>", "Observatory API", DEFAULT_SERVER)
+    .option("--dashboard <url>", "dashboard address")
+    .action(async (commandOptions: DoctorCommandOptions) => {
+      out(
+        await doctorReport({
+          server: commandOptions.server,
+          ...(commandOptions.dashboard !== undefined
+            ? { dashboardUrl: commandOptions.dashboard }
+            : {}),
+        }),
+      );
+    });
 
   return program;
 }
