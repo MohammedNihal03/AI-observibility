@@ -21,6 +21,16 @@ import { ApiUnreachableError, fetchSessions, fetchSnapshot, streamUrl } from "./
 
 const RECONNECT_MS = 1_500;
 const MAX_RECONNECTS = 20;
+/**
+ * How often the session LIST is refreshed.
+ *
+ * The stream carries everything about a session the dashboard is already
+ * watching, but a session that did not exist when the page loaded cannot
+ * announce itself down a socket nobody has opened yet. Polling one small
+ * endpoint on loopback is the honest way to notice `observatory demo --stream`
+ * starting up, and it is the only polling in the dashboard.
+ */
+const SESSION_POLL_MS = 4_000;
 
 export type ConnectionStatus = "loading" | "ready" | "empty" | "unreachable" | "error";
 
@@ -52,13 +62,23 @@ export function useObservatory(): Observatory {
   const activeRef = useRef<string | null>(null);
   activeRef.current = activeId;
 
+  /**
+   * Whether to follow whichever session is newest.
+   *
+   * True until the reader picks one by hand. That is what makes "open the
+   * dashboard, then run the demo" work, without ever yanking someone away from
+   * a session they deliberately opened.
+   */
+  const followLatest = useRef(true);
+
   /* ------------------------------------------------------------ discovery */
 
   useEffect(() => {
     const controller = new AbortController();
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
-    void (async () => {
+    const load = async (): Promise<void> => {
       try {
         const list = await fetchSessions(controller.signal);
         if (cancelled) return;
@@ -73,9 +93,16 @@ export function useObservatory(): Observatory {
           return;
         }
 
-        // The newest session is the one a developer just produced.
-        const next = activeRef.current ?? list[0]?.id ?? null;
-        setActiveId(next);
+        // A session that is still running is what a developer just started;
+        // otherwise the newest one. The list arrives newest-first.
+        const newest = list.find((session) => session.status === "active") ?? list[0];
+        const current = activeRef.current;
+        const stillThere = current !== null && list.some((session) => session.id === current);
+
+        if (!stillThere || (followLatest.current && newest !== undefined && newest.id !== current)) {
+          setActiveId(newest?.id ?? null);
+          setReceived(0);
+        }
         setStatus("ready");
       } catch (cause: unknown) {
         if (cancelled || controller.signal.aborted) return;
@@ -85,11 +112,16 @@ export function useObservatory(): Observatory {
           setStatus("error");
           setError(cause instanceof Error ? cause.message : "unknown error");
         }
+      } finally {
+        if (!cancelled) timer = setTimeout(() => void load(), SESSION_POLL_MS);
       }
-    })();
+    };
+
+    void load();
 
     return () => {
       cancelled = true;
+      if (timer !== null) clearTimeout(timer);
       controller.abort();
     };
   }, [reloadToken]);
@@ -199,11 +231,14 @@ export function useObservatory(): Observatory {
   }, [activeId]);
 
   const select = useCallback((id: string) => {
+    // A deliberate choice wins over the follow-the-newest rule for good.
+    followLatest.current = false;
     setActiveId(id);
     setReceived(0);
   }, []);
 
   const refresh = useCallback(() => {
+    followLatest.current = true;
     setReloadToken((token) => token + 1);
   }, []);
 

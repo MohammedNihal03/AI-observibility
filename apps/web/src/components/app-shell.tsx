@@ -5,32 +5,9 @@ import type { ReactNode } from "react";
 /**
  * The frame around every view: header (BUILD.md section 36) and footer.
  *
- * The status pill says SIMULATED, not LIVE. Phase 9 connects the WebSocket and
- * earns the live indicator; until then, claiming it would be the exact kind of
- * confident falsehood this product exists to prevent.
+ * The status indicator is passed in rather than decided here, because only the
+ * component holding the socket knows whether the word LIVE is currently true.
  */
-/**
- * The status pill. Rendered by the caller rather than by the shell, so a view
- * with no session cannot accidentally advertise one.
- */
-export function SimulatedPill() {
-  return (
-    <div
-      className="flex items-center gap-2 rounded-full border border-clay/25 bg-clay/[0.07] px-3 py-1.5"
-      role="status"
-    >
-      <span
-        aria-hidden="true"
-        className="size-1.5 rounded-full bg-clay"
-        style={{ animation: "breathe 2.4s ease-in-out infinite" }}
-      />
-      <span className="font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-clay-soft">
-        Simulated
-      </span>
-    </div>
-  );
-}
-
 export function AppShell({
   children,
   toolbar,

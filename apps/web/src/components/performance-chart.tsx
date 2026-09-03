@@ -12,7 +12,7 @@ import {
   YAxis,
 } from "recharts";
 
-import type { DashboardSession, TrendPoint } from "@/lib/dashboard-data";
+import type { SessionSnapshot, TrendPoint } from "@observatory/shared";
 
 import { Panel, SectionLabel, Value } from "./ui";
 
@@ -96,17 +96,17 @@ function ChartTooltip({
   );
 }
 
-export function PerformanceChart({ session }: { session: DashboardSession }) {
+export function PerformanceChart({ snapshot }: { snapshot: SessionSnapshot }) {
   const [containerRef, width] = useMeasuredWidth();
 
   const data = useMemo<ChartRow[]>(
     () =>
-      session.trend.map((point: TrendPoint) => ({
+      snapshot.trend.map((point: TrendPoint) => ({
         actions: point.actions,
         health: point.health,
         success: point.successRate === null ? null : Math.round(point.successRate * 100),
       })),
-    [session.trend],
+    [snapshot.trend],
   );
 
   const first = data.find((row) => row.health !== null)?.health ?? null;
@@ -216,7 +216,7 @@ export function PerformanceChart({ session }: { session: DashboardSession }) {
       </div>
 
       <p className="mt-4 border-t border-border pt-4 text-[11px] leading-relaxed text-fg-faint">
-        Health measured cumulatively at {session.trend.length} points, x-axis in completed actions.
+        Health measured cumulatively at {snapshot.trend.length} points, x-axis in completed actions.
         The final point is the headline score.
       </p>
     </Panel>
