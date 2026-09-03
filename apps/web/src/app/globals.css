@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens for the Observatory.
+ *
+ * BUILD.md section 54: professional developer tooling, readable in dark mode,
+ * restrained use of colour. Colour carries meaning here - green/amber/red are
+ * reserved for agent state and must never be used decoratively.
+ */
+@theme {
+  --color-canvas: #0a0c10;
+  --color-surface: #11141a;
+  --color-surface-raised: #171b22;
+  --color-border: #232833;
+  --color-border-strong: #303747;
+
+  --color-fg: #e8ebf1;
+  --color-fg-muted: #98a1b3;
+  --color-fg-faint: #667085;
+
+  --color-accent: #5b9dff;
+  --color-healthy: #3fb950;
+  --color-warn: #d29922;
+  --color-danger: #f85149;
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Visible focus for keyboard users (section 55). */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

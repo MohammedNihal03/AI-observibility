@@ -1,0 +1,15 @@
+// Solution-style root config. `tsc -b` builds every referenced project in
+// dependency order. apps/web is intentionally absent - Next.js type-checks it
+// via `npm run typecheck --workspace @observatory/web`.
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/shared" },
+    { "path": "./packages/telemetry" },
+    { "path": "./packages/metrics" },
+    { "path": "./packages/behavior" },
+    { "path": "./packages/collectors" },
+    { "path": "./apps/server" },
+    { "path": "./cli" }
+  ]
+}

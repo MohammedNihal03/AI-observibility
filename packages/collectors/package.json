@@ -1,0 +1,26 @@
+{
+  "name": "@observatory/collectors",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Agent adapters. Claude Code and Codex are pluggable collectors; the analytics engine never depends on either directly.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean"
+  },
+  "dependencies": {
+    "@observatory/shared": "*",
+    "@observatory/telemetry": "*"
+  }
+}

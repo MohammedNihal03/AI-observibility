@@ -1,0 +1,24 @@
+{
+  "name": "@observatory/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The `observatory` command line interface.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "observatory": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@observatory/collectors": "*",
+    "@observatory/shared": "*",
+    "commander": "^15.0.0"
+  }
+}

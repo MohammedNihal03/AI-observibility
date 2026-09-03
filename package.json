@@ -1,0 +1,42 @@
+{
+  "name": "ai-agent-observatory",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TensorBoard for AI coding agents - local-first behavioral observability for Claude Code and Codex.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "cli"
+  ],
+  "scripts": {
+    "build": "npm run build:packages && npm run build --workspace @observatory/web",
+    "build:packages": "tsc -b",
+    "clean": "tsc -b --clean",
+    "dev": "npm run build:packages && concurrently -k -n pkg,server,web -c gray,cyan,magenta \"tsc -b --watch --preserveWatchOutput\" \"npm run dev --workspace @observatory/server\" \"npm run dev --workspace @observatory/web\"",
+    "dev:server": "npm run dev --workspace @observatory/server",
+    "dev:web": "npm run dev --workspace @observatory/web",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -b && npm run typecheck --workspace @observatory/web"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.4.1",
+    "@vitest/coverage-v8": "^4.1.11",
+    "concurrently": "^10.0.5",
+    "eslint": "^10.9.1",
+    "prettier": "^3.9.6",
+    "tsx": "^4.23.13",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.69.0",
+    "vitest": "^4.1.11"
+  }
+}

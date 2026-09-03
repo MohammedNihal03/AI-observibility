@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    { "path": "../../packages/shared" },
+    { "path": "../../packages/telemetry" },
+    { "path": "../../packages/metrics" },
+    { "path": "../../packages/behavior" },
+    { "path": "../../packages/collectors" }
+  ]
+}

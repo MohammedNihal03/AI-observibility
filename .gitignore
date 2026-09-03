@@ -1,0 +1,23 @@
+node_modules/
+dist/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+.tsbuildinfo
+
+# Local telemetry database - contains captured session data. Never commit it.
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+data/
+
+.env
+.env.local
+.env.*.local
+
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
