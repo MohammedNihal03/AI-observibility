@@ -73,10 +73,7 @@ const EMPTY_TREND = (metric: TrendMetric): Trend => ({
   observations: 0,
 });
 
-export function computeTrend(
-  windows: readonly WindowMetrics[],
-  metric: TrendMetric,
-): Trend {
+export function computeTrend(windows: readonly WindowMetrics[], metric: TrendMetric): Trend {
   const points: { x: number; y: number }[] = [];
   windows.forEach((window, index) => {
     const value = window[metric];
@@ -129,9 +126,7 @@ export function computeTrend(
 }
 
 export function computeTrends(windows: readonly WindowMetrics[]): TrendSet {
-  const entries = TREND_METRICS.map(
-    (metric) => [metric, computeTrend(windows, metric)] as const,
-  );
+  const entries = TREND_METRICS.map((metric) => [metric, computeTrend(windows, metric)] as const);
   return Object.fromEntries(entries) as TrendSet;
 }
 

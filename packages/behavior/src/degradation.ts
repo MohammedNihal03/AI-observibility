@@ -142,8 +142,7 @@ export function computeDegradation(
       // Signal 6: possible goal drift. Named "possible" on purpose - the
       // keyword detector is a lexical proxy, not a reading of intent.
       name: "goalDrift",
-      severity:
-        trends.goalAdherence.last === null ? null : rise(1 - trends.goalAdherence.last),
+      severity: trends.goalAdherence.last === null ? null : rise(1 - trends.goalAdherence.last),
       weight: weights.goalDrift,
       evidence:
         trends.goalAdherence.last === null

@@ -29,7 +29,13 @@ export type { CorrectionLoopResult, FailureEpisode, RecoveryResult } from "./rec
 export { computeWindows, measureWindow, splitIntoWindows } from "./windows.js";
 export type { WindowMetrics, WindowOptions, WindowSet } from "./windows.js";
 
-export { computeTrend, computeTrends, improvementOf, isLowerBetter, TREND_METRICS } from "./trends.js";
+export {
+  computeTrend,
+  computeTrends,
+  improvementOf,
+  isLowerBetter,
+  TREND_METRICS,
+} from "./trends.js";
 export type { Trend, TrendMetric, TrendSet } from "./trends.js";
 
 export { computeHealth } from "./health.js";

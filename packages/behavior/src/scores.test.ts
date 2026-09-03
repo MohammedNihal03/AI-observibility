@@ -270,7 +270,11 @@ describe("degradation score (sections 23, 24)", () => {
   it("raises the repeated-failure signal at three in a row (section 16)", () => {
     const result = computeDegradation({
       trends: flatTrends,
-      repetition: { ...EMPTY_REPETITION, longestConsecutiveFailureRun: 3, repeatedFailedActions: 2 },
+      repetition: {
+        ...EMPTY_REPETITION,
+        longestConsecutiveFailureRun: 3,
+        repeatedFailedActions: 2,
+      },
       loops: EMPTY_CORRECTION_LOOPS,
       contextPressure: 0.2,
     });

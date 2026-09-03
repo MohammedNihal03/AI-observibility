@@ -104,7 +104,13 @@ export function computeHealth(
   });
 
   const score = Math.round(
-    Math.min(100, Math.max(0, components.reduce((total, part) => total + part.contribution, 0))),
+    Math.min(
+      100,
+      Math.max(
+        0,
+        components.reduce((total, part) => total + part.contribution, 0),
+      ),
+    ),
   );
 
   return {

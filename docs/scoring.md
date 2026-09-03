@@ -100,6 +100,41 @@ and says the maximum is unknown. No pricing for a model means `estimatedCost = n
 Given the same events and the same configuration, the output is identical. No randomness, no clock
 reads inside scoring, no network calls, no LLM (sections 50, 57).
 
+## How the three scores are built
+
+All three combine components that may individually be unmeasurable. **A missing component is
+excluded and the remaining weights are renormalised — it is never scored as zero.** A session with
+no failures has no recovery rate, and recovery is 30% of health; scoring that absence as zero would
+cap a flawless session at 70 and make "never failed once" look worse than "failed and recovered".
+The count of components that were actually measured travels with each score, so a score derived from
+two inputs can be presented as less certain than one derived from five.
+
+### Health, 0–100
+
+Weighted average of five components, each stated so higher is better: recovery rate, tool
+efficiency, `1 − repetition`, goal adherence, `1 − context pressure`. Null when fewer than two
+components are measurable.
+
+### Behavioral learning, 0–100
+
+The weighted sum of five _improvements_ — sign-corrected so a falling error rate and a rising
+recovery rate both count as positive — mapped onto 0–100 with **50 as "nothing changed"**:
+
+```
+ 50  nothing moved                    -> STABLE
+100  every metric improved maximally  -> IMPROVING
+  0  every metric regressed maximally -> DEGRADING
+```
+
+50 rather than 0 as the neutral point matters: a steady, competent session that never had anything
+to improve is not a failing session.
+
+### Degradation, 0–100
+
+The seven signals of §23, each reduced to a 0–1 severity and combined with the §24 weights. 0 means
+no degradation detected. Every individual signal is exposed with the measurement behind it, because
+"your agent is at 62" tells a developer nothing about what to do.
+
 ## How each measured metric is defined
 
 Precision matters more than brevity here: a counter whose definition is unclear is worse than no
@@ -129,6 +164,14 @@ failed" from "the telemetry has a gap".
 `successfulToolCalls / totalToolCalls`, but its numerator is derived from results, so the
 denominator must be the same population. Dividing results by invocations produced 75/49 on a real
 session — over 1, clamped to a flattering 100%, while eight tool calls had in fact failed.
+
+**Repetition is only measured over actions we can tell apart.** A signature like
+`tool_call|tool:Grep` identifies no subject, so two unrelated searches are indistinguishable from
+the same search run twice. Those actions are excluded from the repetition measure — reported as
+`unmeasurableActions` — rather than assumed identical. On a real session, assuming they were
+identical produced a 60% repetition rate and a fabricated "repetition increased 414%" from fourteen
+genuinely different searches. Adapters avoid this by populating `tool.target` with whatever drives
+the tool: a search pattern, a URL, a query.
 
 **Context is a level, not a running total.** Summing every turn's input tokens yields a number many
 times larger than any real context window. The peak of (input + cached) on a single turn is what the

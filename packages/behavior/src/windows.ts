@@ -98,7 +98,9 @@ export function splitIntoWindows(
     // model response - is not discarded.
     const startIndex = window === 0 ? 0 : (firstActionIndex[window] ?? 0);
     const endIndex =
-      window === count - 1 ? events.length - 1 : (firstActionIndex[window + 1] ?? events.length) - 1;
+      window === count - 1
+        ? events.length - 1
+        : (firstActionIndex[window + 1] ?? events.length) - 1;
     boundaries.push({ startIndex, endIndex });
   }
 

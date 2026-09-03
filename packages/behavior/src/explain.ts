@@ -106,7 +106,9 @@ export function explainState(
   }
 
   // Counts that are not trends but matter more than any of them.
-  if (inputs.repetition.longestConsecutiveFailureRun >= config.repetition.consecutiveFailureThreshold) {
+  if (
+    inputs.repetition.longestConsecutiveFailureRun >= config.repetition.consecutiveFailureThreshold
+  ) {
     const worst = inputs.repetition.repeatedSignatures[0];
     reasons.unshift({
       type: "negative",
@@ -146,7 +148,10 @@ export function explainState(
 
   // Context is reported as an observation. It never says context caused
   // anything (section 23).
-  if (inputs.contextPressure !== null && inputs.contextPressure >= config.context.warningThreshold) {
+  if (
+    inputs.contextPressure !== null &&
+    inputs.contextPressure >= config.context.warningThreshold
+  ) {
     reasons.push({
       type: "warning",
       message: `Context utilization is high (${Math.round(inputs.contextPressure * 100)}%)`,
@@ -155,7 +160,10 @@ export function explainState(
     });
   }
 
-  if (inputs.learning.state === "insufficient_data" && inputs.learning.insufficientReason !== null) {
+  if (
+    inputs.learning.state === "insufficient_data" &&
+    inputs.learning.insufficientReason !== null
+  ) {
     reasons.push({
       type: "neutral",
       message: `Not enough data to judge a trend yet - ${inputs.learning.insufficientReason}`,
@@ -232,7 +240,12 @@ export function deriveSignals(
     });
   }
 
-  for (const trend of [inputs.trends.errorRate, inputs.trends.recoveryRate, inputs.trends.repetitionRate, inputs.trends.toolEfficiency]) {
+  for (const trend of [
+    inputs.trends.errorRate,
+    inputs.trends.recoveryRate,
+    inputs.trends.repetitionRate,
+    inputs.trends.toolEfficiency,
+  ]) {
     if (trend.delta === null || Math.abs(trend.delta) < config.explain.minReportableDelta) continue;
     const improved = isLowerBetter(trend.metric) ? trend.delta < 0 : trend.delta > 0;
     if (!improved) continue;

@@ -38,20 +38,83 @@ export interface GoalDriftDetector {
    * actions. Null is not 0 - "we cannot tell" must never render as "completely
    * off task".
    */
-  measureAdherence(
-    events: readonly NormalizedAgentEvent[],
-    goal: SessionGoal,
-  ): number | null;
+  measureAdherence(events: readonly NormalizedAgentEvent[], goal: SessionGoal): number | null;
 }
 
 /** Words too common to carry meaning as goal keywords. */
 const STOP_WORDS = new Set([
-  "the", "a", "an", "and", "or", "but", "if", "then", "than", "that", "this", "these", "those",
-  "is", "are", "was", "were", "be", "been", "being", "to", "of", "in", "on", "at", "by", "for",
-  "with", "from", "into", "about", "as", "it", "its", "we", "i", "you", "should", "would", "could",
-  "can", "will", "make", "made", "do", "does", "did", "get", "got", "fix", "fixes", "fixed",
-  "issue", "issues", "problem", "bug", "please", "also", "not", "no", "when", "where", "why",
-  "how", "all", "any", "some", "up", "out", "so", "my", "our",
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "but",
+  "if",
+  "then",
+  "than",
+  "that",
+  "this",
+  "these",
+  "those",
+  "is",
+  "are",
+  "was",
+  "were",
+  "be",
+  "been",
+  "being",
+  "to",
+  "of",
+  "in",
+  "on",
+  "at",
+  "by",
+  "for",
+  "with",
+  "from",
+  "into",
+  "about",
+  "as",
+  "it",
+  "its",
+  "we",
+  "i",
+  "you",
+  "should",
+  "would",
+  "could",
+  "can",
+  "will",
+  "make",
+  "made",
+  "do",
+  "does",
+  "did",
+  "get",
+  "got",
+  "fix",
+  "fixes",
+  "fixed",
+  "issue",
+  "issues",
+  "problem",
+  "bug",
+  "please",
+  "also",
+  "not",
+  "no",
+  "when",
+  "where",
+  "why",
+  "how",
+  "all",
+  "any",
+  "some",
+  "up",
+  "out",
+  "so",
+  "my",
+  "our",
 ]);
 
 const MIN_KEYWORD_LENGTH = 3;
@@ -68,7 +131,8 @@ export function extractKeywords(text: string | null): readonly string[] {
     .toLowerCase()
     .split(/[^a-z0-9_]+/u)
     .filter(
-      (token) => token.length >= MIN_KEYWORD_LENGTH && !STOP_WORDS.has(token) && !/^\d+$/u.test(token),
+      (token) =>
+        token.length >= MIN_KEYWORD_LENGTH && !STOP_WORDS.has(token) && !/^\d+$/u.test(token),
     );
   return [...new Set(tokens)];
 }
@@ -87,7 +151,10 @@ export function createKeywordGoalDriftDetector(): GoalDriftDetector {
 
     measureAdherence(events, goal) {
       const keywords = [
-        ...new Set([...goal.keywords.map((keyword) => keyword.toLowerCase()), ...extractKeywords(goal.text)]),
+        ...new Set([
+          ...goal.keywords.map((keyword) => keyword.toLowerCase()),
+          ...extractKeywords(goal.text),
+        ]),
       ].filter((keyword) => keyword.length >= MIN_KEYWORD_LENGTH);
 
       if (keywords.length === 0) return null;

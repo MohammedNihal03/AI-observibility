@@ -1,8 +1,4 @@
-import {
-  DEFAULT_SCORING_CONFIG,
-  type AgentState,
-  type ScoringConfig,
-} from "@observatory/shared";
+import { DEFAULT_SCORING_CONFIG, type AgentState, type ScoringConfig } from "@observatory/shared";
 
 import { improvementOf, type TrendMetric, type TrendSet } from "./trends.js";
 import type { WindowSet } from "./windows.js";

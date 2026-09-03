@@ -79,12 +79,7 @@ describe("failure episodes", () => {
   });
 
   it("keeps failures of different actions in separate episodes", () => {
-    const events = session()
-      .run("npm test")
-      .fail()
-      .run("npm run lint")
-      .fail()
-      .build();
+    const events = session().run("npm test").fail().run("npm run lint").fail().build();
 
     const { recovery } = analyze(events);
     expect(recovery.failures).toBe(2);
@@ -130,13 +125,7 @@ describe("failure episodes", () => {
 
 describe("correction loops (section 17)", () => {
   it("counts a failed correction loop when the fix did not work", () => {
-    const events = session()
-      .run("npm test")
-      .fail()
-      .edit("src/a.ts")
-      .run("npm test")
-      .fail()
-      .build();
+    const events = session().run("npm test").fail().edit("src/a.ts").run("npm test").fail().build();
 
     const { loops } = analyze(events);
     expect(loops.correctionLoops).toBe(1);

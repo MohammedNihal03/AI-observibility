@@ -180,9 +180,7 @@ describe("explanations (section 27)", () => {
 
   it("caps the number of reasons so the panel stays readable", () => {
     const analysis = analyzeSession(degradingSession());
-    expect(analysis.reasons.length).toBeLessThanOrEqual(
-      DEFAULT_SCORING_CONFIG.explain.maxReasons,
-    );
+    expect(analysis.reasons.length).toBeLessThanOrEqual(DEFAULT_SCORING_CONFIG.explain.maxReasons);
   });
 
   it("says so plainly when there is not enough data", () => {
@@ -215,7 +213,9 @@ describe("signals (sections 15, 23, 51)", () => {
   });
 
   it("emits no signals for a clean short session", () => {
-    const analysis = analyzeSession(session().read("a.ts").edit("a.ts").run("npm test").ok().build());
+    const analysis = analyzeSession(
+      session().read("a.ts").edit("a.ts").run("npm test").ok().build(),
+    );
     expect(signalsFor("s", analysis)).toEqual([]);
   });
 });

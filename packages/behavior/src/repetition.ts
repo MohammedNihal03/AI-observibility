@@ -41,7 +41,9 @@ export interface RepeatedSignature {
  * fourteen genuinely different searches.
  */
 export function isDiscriminating(signature: string): boolean {
-  return signature.includes("|cmd:") || signature.includes("|path:") || signature.includes("|target:");
+  return (
+    signature.includes("|cmd:") || signature.includes("|path:") || signature.includes("|target:")
+  );
 }
 
 export interface RepetitionResult {

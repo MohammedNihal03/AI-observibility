@@ -226,7 +226,10 @@ export function validateScoringConfig(config: ScoringConfig): readonly ScoringCo
 
   const { healthy, stable, warning } = config.health.bands;
   if (!(healthy > stable && stable > warning)) {
-    problems.push({ group: "health.bands", message: "bands must descend: healthy > stable > warning" });
+    problems.push({
+      group: "health.bands",
+      message: "bands must descend: healthy > stable > warning",
+    });
   }
 
   if (config.learning.improvingThreshold <= 0) {
@@ -239,7 +242,10 @@ export function validateScoringConfig(config: ScoringConfig): readonly ScoringCo
     problems.push({ group: "windows", message: "at least two windows are needed for a trend" });
   }
   if (config.context.warningThreshold >= config.context.criticalThreshold) {
-    problems.push({ group: "context", message: "warningThreshold must be below criticalThreshold" });
+    problems.push({
+      group: "context",
+      message: "warningThreshold must be below criticalThreshold",
+    });
   }
 
   return problems;
@@ -254,7 +260,10 @@ export function assertValidScoringConfig(config: ScoringConfig): void {
 }
 
 /** Maps a 0-100 score to its band (section 26). */
-export function healthStateFor(score: number, config: ScoringConfig = DEFAULT_SCORING_CONFIG): HealthState {
+export function healthStateFor(
+  score: number,
+  config: ScoringConfig = DEFAULT_SCORING_CONFIG,
+): HealthState {
   const { healthy, stable, warning } = config.health.bands;
   if (score >= healthy) return "healthy";
   if (score >= stable) return "stable";

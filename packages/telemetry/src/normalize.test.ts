@@ -223,9 +223,9 @@ describe("eventSignature", () => {
   // Regression: without a target, every Grep shared one signature and fourteen
   // different searches read as one action repeated fourteen times.
   it("uses the tool target when there is neither command nor path", () => {
-    expect(
-      eventSignature({ type: "tool_call", tool: { name: "Grep", target: "TODO" } }),
-    ).toBe("tool_call|tool:Grep|target:TODO");
+    expect(eventSignature({ type: "tool_call", tool: { name: "Grep", target: "TODO" } })).toBe(
+      "tool_call|tool:Grep|target:TODO",
+    );
   });
 
   it("distinguishes two searches for different things", () => {
@@ -252,9 +252,9 @@ describe("eventSignature", () => {
   });
 
   it("normalizes whitespace in a target", () => {
-    expect(
-      eventSignature({ type: "search", tool: { name: "Grep", target: "  foo   bar " } }),
-    ).toBe("search|tool:Grep|target:foo bar");
+    expect(eventSignature({ type: "search", tool: { name: "Grep", target: "  foo   bar " } })).toBe(
+      "search|tool:Grep|target:foo bar",
+    );
   });
 
   it("treats a blank target as absent", () => {

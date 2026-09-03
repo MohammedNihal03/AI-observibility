@@ -23,11 +23,7 @@ import {
 import { computeHealth, type HealthResult } from "./health.js";
 import { computeLearning, type LearningResult } from "./learning.js";
 import { pairActionsWithOutcomes, type PairingResult } from "./pairing.js";
-import {
-  analyzeRecovery,
-  type CorrectionLoopResult,
-  type RecoveryResult,
-} from "./recovery.js";
+import { analyzeRecovery, type CorrectionLoopResult, type RecoveryResult } from "./recovery.js";
 import { detectRepetition, type RepetitionResult } from "./repetition.js";
 import { computeTrends, type TrendSet } from "./trends.js";
 import { computeWindows, type WindowSet } from "./windows.js";
@@ -158,10 +154,7 @@ export function analyzeSession(
 }
 
 /** Signals for a specific session id, ready to persist. */
-export function signalsFor(
-  sessionId: string,
-  analysis: BehaviorAnalysis,
-): readonly SignalCreate[] {
+export function signalsFor(sessionId: string, analysis: BehaviorAnalysis): readonly SignalCreate[] {
   return analysis.signals.map((signal) => ({ ...signal, sessionId }));
 }
 

@@ -28,8 +28,9 @@ Under active construction, one phase at a time (see `Build.md`, section 58).
 | 2 — Event system          | done        |
 | 3 — SQLite persistence    | done        |
 | 4 — Metrics engine        | done        |
-| 5 — Behavioral engine     | next        |
-| 6–13 — demo → adapters    | not started |
+| 5 — Behavioral engine     | done        |
+| 6 — Demo generator        | next        |
+| 7–13 — API → adapters     | not started |
 
 The CLI registers all of its commands today, but every command reports honestly that it is not
 implemented yet and names the phase that will implement it.

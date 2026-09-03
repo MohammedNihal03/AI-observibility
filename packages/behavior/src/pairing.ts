@@ -76,9 +76,7 @@ export interface PairingResult {
   readonly orphanOutcomes: readonly NormalizedAgentEvent[];
 }
 
-export function pairActionsWithOutcomes(
-  events: readonly NormalizedAgentEvent[],
-): PairingResult {
+export function pairActionsWithOutcomes(events: readonly NormalizedAgentEvent[]): PairingResult {
   const pending: { action: NormalizedAgentEvent; index: number }[] = [];
   const byCallId = new Map<string, { action: NormalizedAgentEvent; index: number }>();
   const resolved = new Map<number, { outcome: NormalizedAgentEvent; pairedBy: PairingStrategy }>();
@@ -144,7 +142,9 @@ function outcomeOf(event: NormalizedAgentEvent): boolean | null {
 }
 
 /** Actions in the order they occurred. */
-export function actionsOf(events: readonly NormalizedAgentEvent[]): readonly NormalizedAgentEvent[] {
+export function actionsOf(
+  events: readonly NormalizedAgentEvent[],
+): readonly NormalizedAgentEvent[] {
   return events.filter(isActionEvent);
 }
 
