@@ -1,8 +1,9 @@
 import { generateDemoSession, type DemoScenario } from "@observatory/collectors";
+import type { GroupComparison } from "@observatory/shared";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createApp } from "./app.js";
-import { compareGroups, compareSessions, type GroupComparison } from "./compare.js";
+import { compareGroups, compareSessions } from "./compare.js";
 import { createDatabase, type DatabaseHandle } from "./db/client.js";
 
 /**

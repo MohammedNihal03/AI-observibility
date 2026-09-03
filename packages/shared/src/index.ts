@@ -120,6 +120,15 @@ export type {
   ScoringConfigProblem,
 } from "./scoring.js";
 
+export { GROUP_KEYS, LOWER_IS_BETTER, METRIC_LABELS, RATE_METRICS } from "./compare.js";
+export type {
+  GroupBy,
+  GroupComparison,
+  GroupStats,
+  MetricDelta,
+  SessionComparison,
+} from "./compare.js";
+
 export type {
   HealthComponentView,
   SessionSnapshot,

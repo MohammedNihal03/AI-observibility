@@ -2,6 +2,7 @@ import {
   agentEventInputSchema,
   sessionCreateSchema,
   sessionUpdateSchema,
+  type GroupBy,
   type NormalizedAgentEvent,
   type SessionSnapshot,
 } from "@observatory/shared";
@@ -10,7 +11,7 @@ import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 
-import { compareGroups, compareSessions, type GroupBy } from "./compare.js";
+import { compareGroups, compareSessions } from "./compare.js";
 import type { Hub } from "./hub.js";
 import { analyzeStoredSession, buildSnapshot, buildSummary, toTimelineEntry } from "./snapshot.js";
 

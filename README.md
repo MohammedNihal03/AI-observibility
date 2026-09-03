@@ -37,6 +37,7 @@ Under active construction, one phase at a time (see `Build.md`, section 58).
 | 11 — Claude Code adapter  | done        |
 | 12 — Codex adapter        | not started |
 | 13 — Polish               | done        |
+| V2 — comparison, strategy | partly done |
 
 Everything works except the Codex adapter: the API, the live dashboard, the full CLI, and
 `observatory import`, which observes **real Claude Code sessions**. Codex sessions are readable in
@@ -111,6 +112,7 @@ observatory sessions    List recorded sessions with their scores
 observatory dashboard   Open the dashboard in a browser
 observatory demo        Generate and analyze a simulated session
 observatory import      Observe a real Claude Code session
+observatory compare     Compare two sessions, or group them by model or prompt
 observatory doctor      Check the local environment and integrations
 ```
 
@@ -275,6 +277,64 @@ Ingestion follows one order, deliberately: **validate → normalize → redact �
 broadcast**. Redaction sits upstream of both the database and the socket, so neither can be handed a
 credential. The broadcast carries a freshly recomputed snapshot rather than a diff, so the client
 never has to hold a second opinion about what the numbers are.
+
+---
+
+## Comparison and repeated strategies (V2)
+
+### `observatory compare`
+
+```bash
+observatory compare <session-a> <session-b>   # two sessions, side by side
+observatory compare --by model                # every session, grouped by model
+observatory compare --by goal                 # ... by prompt
+observatory compare --by source               # ... by agent
+```
+
+```
+  left    demo_degrading_BA7E   (degrading)
+  right   demo_improving_9E21   (improving)
+
+                         LEFT    RIGHT   CHANGE
+  Health                   35       74   +39  better
+  Recovery rate           33%     100%   +67 pts  better
+  Error rate              71%      35%   -35 pts  better
+
+  Only on the left:
+    - npm test → read docs — tried 2 times, never worked
+    - npm test -- session failed 7 times in a row
+```
+
+Grouped comparison reports **medians, not means** — one three-hour disaster
+should not define a model — and every row carries its session count, because a
+comparison drawn from one session each is a data point, not a finding. It is
+observational throughout: two sessions differ in the model *and* the task *and*
+the day, so the output says "difference", never "improvement".
+
+### Repeated strategies
+
+Repetition detection compares single actions by exact signature. It catches
+`npm test` run three times. It cannot catch this:
+
+```
+edit auth.ts → npm test -- auth   (fails)
+edit user.ts → npm test -- user   (fails)
+edit role.ts → npm test -- role   (fails)
+```
+
+Six actions, every signature distinct, repetition rate zero — and an agent
+applying the same failing approach three times. Strategy detection generalizes
+each action (`src/auth/token.ts` → `edit:src/auth`, `npm test -- auth` →
+`run:npm test`) and looks for repeated *sequences*. A strategy that has been
+tried repeatedly and has never once worked is raised as a signal.
+
+**Not embeddings**, and the code says so. Generalizing is a coarser comparison
+rather than a smarter one: two edits in the same directory count as the same
+move even when they are unrelated. The goal-drift detector is likewise token
+matching with stem and prefix tolerance — enough to connect a goal that says
+"authentication" to a file called `auth.ts`, not enough to connect "login" to
+`session-store.ts`. Both sit behind interfaces so an embedding backend can
+replace them without touching anything else.
 
 ---
 

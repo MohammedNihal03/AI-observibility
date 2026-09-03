@@ -1,4 +1,13 @@
-import type { AgentState, SessionSnapshot } from "@observatory/shared";
+import {
+  LOWER_IS_BETTER,
+  type AgentState,
+  type GroupBy,
+  type GroupComparison,
+  type GroupStats,
+  type MetricDelta,
+  type SessionComparison,
+  type SessionSnapshot,
+} from "@observatory/shared";
 
 import { analyzeStoredSession, buildSnapshot, type AnalyzedSession } from "./snapshot.js";
 import type { Store } from "./db/store.js";
@@ -19,38 +28,6 @@ import type { Store } from "./db/store.js";
  * so a difference drawn from one session each is visibly worth nothing, and the
  * word used throughout is "difference", not "improvement".
  */
-
-/** Metrics compared across sessions and groups. Higher is better for all. */
-export const COMPARED_METRICS = [
-  "health",
-  "learning",
-  "successRate",
-  "recoveryRate",
-  "toolEfficiency",
-] as const;
-export type ComparedMetric = (typeof COMPARED_METRICS)[number];
-
-/** Metrics where a LOWER value is the better one. */
-export const LOWER_IS_BETTER: readonly ComparedMetric[] = [];
-
-export interface MetricDelta {
-  readonly metric: string;
-  readonly left: number | null;
-  readonly right: number | null;
-  /** right - left. Null when either side could not be measured. */
-  readonly delta: number | null;
-  /** True when the change is in the better direction. Null when unmeasurable. */
-  readonly better: boolean | null;
-}
-
-export interface SessionComparison {
-  readonly left: SessionSnapshot;
-  readonly right: SessionSnapshot;
-  readonly deltas: readonly MetricDelta[];
-  /** Strategies the right session repeated that the left did not, and vice versa. */
-  readonly onlyLeftSignals: readonly string[];
-  readonly onlyRightSignals: readonly string[];
-}
 
 function pick(snapshot: SessionSnapshot, metric: string): number | null {
   switch (metric) {
@@ -78,7 +55,7 @@ function deltaOf(metric: string, left: number | null, right: number | null): Met
     return { metric, left, right, delta: null, better: null };
   }
   const delta = right - left;
-  const lowerIsBetter = metric === "repetitionRate" || metric === "errorRate";
+  const lowerIsBetter = LOWER_IS_BETTER.includes(metric);
   return {
     metric,
     left,
@@ -128,28 +105,6 @@ export function compareSessions(
 /* -------------------------------------------------------------------------- */
 /* Grouped comparison                                                         */
 /* -------------------------------------------------------------------------- */
-
-export type GroupBy = "model" | "goal" | "source";
-
-export interface GroupStats {
-  readonly key: string;
-  readonly sessions: number;
-  readonly totalEvents: number;
-  /** Medians, not means: one catastrophic session should not define a model. */
-  readonly health: number | null;
-  readonly learning: number | null;
-  readonly successRate: number | null;
-  readonly recoveryRate: number | null;
-  readonly repetitionRate: number | null;
-  readonly states: Readonly<Record<AgentState, number>>;
-}
-
-export interface GroupComparison {
-  readonly groupBy: GroupBy;
-  readonly groups: readonly GroupStats[];
-  /** Sessions that had no value for the grouping key. */
-  readonly ungrouped: number;
-}
 
 /**
  * The median of the values that exist.

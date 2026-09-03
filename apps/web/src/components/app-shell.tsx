@@ -1,5 +1,6 @@
 import { OBSERVATORY_VERSION } from "@observatory/shared";
 import Image from "next/image";
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 /**
@@ -8,6 +9,12 @@ import type { ReactNode } from "react";
  * The status indicator is passed in rather than decided here, because only the
  * component holding the socket knows whether the word LIVE is currently true.
  */
+/** The two views. A third would want a real nav; two want two links. */
+const NAV = [
+  { href: "/", label: "Session" },
+  { href: "/compare", label: "Compare" },
+] as const;
+
 export function AppShell({
   children,
   toolbar,
@@ -42,6 +49,18 @@ export function AppShell({
               </p>
             </div>
           </div>
+
+          <nav aria-label="Views" className="flex items-center gap-1">
+            {NAV.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="rounded-full px-3 py-1.5 text-[12px] font-medium text-fg-faint transition-colors duration-300 hover:bg-fg/[0.04] hover:text-fg aria-[current=page]:text-clay-soft"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
 
           <div className="order-last w-full sm:order-none sm:ml-auto sm:w-auto">{toolbar}</div>
 

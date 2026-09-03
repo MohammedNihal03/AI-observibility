@@ -1,4 +1,10 @@
-import type { SessionSnapshot, SessionSummary } from "@observatory/shared";
+import type {
+  GroupBy,
+  GroupComparison,
+  SessionComparison,
+  SessionSnapshot,
+  SessionSummary,
+} from "@observatory/shared";
 
 /**
  * The dashboard's only source of data (BUILD.md sections 31, 32).
@@ -43,6 +49,21 @@ export async function fetchSessions(signal?: AbortSignal): Promise<readonly Sess
 
 export function fetchSnapshot(id: string, signal?: AbortSignal): Promise<SessionSnapshot> {
   return getJson<SessionSnapshot>(`/api/sessions/${encodeURIComponent(id)}`, signal);
+}
+
+export function fetchComparison(
+  left: string,
+  right: string,
+  signal?: AbortSignal,
+): Promise<SessionComparison> {
+  return getJson<SessionComparison>(
+    `/api/compare?left=${encodeURIComponent(left)}&right=${encodeURIComponent(right)}`,
+    signal,
+  );
+}
+
+export function fetchGroups(by: GroupBy, signal?: AbortSignal): Promise<GroupComparison> {
+  return getJson<GroupComparison>(`/api/compare?by=${encodeURIComponent(by)}`, signal);
 }
 
 /** The stream endpoint, derived from the API base so one env var configures both. */
