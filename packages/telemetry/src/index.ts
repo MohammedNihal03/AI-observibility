@@ -5,14 +5,41 @@
  *
  *   raw event -> validation -> normalization -> redaction -> persistence
  *
- * PHASE 1 (current): package identity + build wiring only.
- * PHASE 2 fills in: validate.ts (Zod parsing of untrusted input),
- *                   normalize.ts (command/path normalization used later by
- *                   repetition detection, section 15), and the in-memory
- *                   event processor.
- * PHASE 2 also fills in: redact.ts - secret redaction (section 48). This is a
- *                   hard requirement: it must run BEFORE anything is written to
- *                   SQLite, never after.
+ * PHASE 2 (current): validation, normalization, redaction and the in-memory
+ *                    processor. Redaction runs before the persistence sink, by
+ *                    construction rather than by convention (section 48).
+ * PHASE 3 adds: a SQLite-backed sink behind the same `onEvent` hook.
  */
 
 export const PACKAGE_NAME = "@observatory/telemetry" as const;
+
+export { EventValidationError } from "./errors.js";
+export type { EventValidationIssue } from "./errors.js";
+
+export {
+  parseAgentEvent,
+  parseEventInput,
+  parseNormalizedEvent,
+  tryParseEventInput,
+} from "./validate.js";
+
+export {
+  DEFAULT_INSIGNIFICANT_FLAGS,
+  eventSignature,
+  normalizeCommand,
+  normalizeEvent,
+  normalizePath,
+  normalizeWhitespace,
+} from "./normalize.js";
+export type { NormalizeContext, NormalizeOptions } from "./normalize.js";
+
+export { redactDeep, redactEvent, redactString, redactionKinds } from "./redact.js";
+export type { RedactionHit, RedactionResult } from "./redact.js";
+
+export { createEventProcessor, fixedClock, sequentialIds } from "./processor.js";
+export type {
+  EventProcessor,
+  EventProcessorOptions,
+  EventProcessorStats,
+  ProcessedEvent,
+} from "./processor.js";

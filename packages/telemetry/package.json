@@ -20,6 +20,8 @@
     "clean": "tsc -b --clean"
   },
   "dependencies": {
-    "@observatory/shared": "*"
+    "@observatory/shared": "*",
+    "nanoid": "^6.0.1",
+    "zod": "^4.5.4"
   }
 }

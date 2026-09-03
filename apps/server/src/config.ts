@@ -12,6 +12,11 @@ export interface ServerConfig {
   readonly port: number;
   /** Origins allowed to call the API. The dashboard dev server by default. */
   readonly allowedOrigins: readonly string[];
+  /**
+   * SQLite file. Undefined means the default (`data/observatory.db` at the repo
+   * root). ":memory:" gives an ephemeral database, which is what tests use.
+   */
+  readonly databaseFile: string | undefined;
 }
 
 const DEFAULT_PORT = 4000;
@@ -33,11 +38,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     allowedOrigins: [
       // The dashboard runs on a dedicated port so it cannot collide with the
       // many other dev servers that squat on 3000.
+      //"*"
       "http://localhost:4001",
       "http://127.0.0.1:4001",
       ...(env.OBSERVATORY_ALLOWED_ORIGINS?.split(",")
         .map((origin) => origin.trim())
         .filter(Boolean) ?? []),
     ],
+    databaseFile: env.OBSERVATORY_DB,
   };
 }

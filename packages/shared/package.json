@@ -18,5 +18,8 @@
   "scripts": {
     "build": "tsc -b",
     "clean": "tsc -b --clean"
+  },
+  "dependencies": {
+    "zod": "^4.5.4"
   }
 }
