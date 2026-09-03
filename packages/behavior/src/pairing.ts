@@ -18,17 +18,33 @@ import {
  *
  * 1. **By call id.** When an adapter records the agent's own identifier (Claude
  *    Code has `tool_use_id`, Codex has `call_id`) in `metadata.callId`, pairing
- *    is exact.
- * 2. **By arrival order.** Otherwise, outcomes are matched to the oldest
- *    unmatched action - FIFO, not LIFO. Agents issue tool calls in parallel and
- *    the results come back in the order they were requested, so a stack would
- *    pair call A with result B.
+ *    is exact. Adapters for agents that issue tool calls in PARALLEL should
+ *    always supply it - see the trade-off below.
+ * 2. **Nearest preceding unmatched action.** Otherwise an outcome is attributed
+ *    to the most recent action still awaiting one.
  *
- * The fallback is a heuristic and is labelled as one: `pairedBy` records which
- * strategy was used, so nothing downstream mistakes an inference for a fact.
+ * ## Why nearest-preceding and not first-in-first-out
+ *
+ * FIFO looks more correct for a parallel batch - calls A then B, results A then
+ * B - and it is. But it breaks badly on the far more common case of an action
+ * that never reports an outcome at all: file edits emitted by the generic API,
+ * or any collector that records the call and not the result. Those actions sit
+ * in the queue forever and every later outcome is attributed to them. On the
+ * canonical section 16 session that meant `npm test` failing was credited to a
+ * file read, and recovery detection produced zero recoveries for a session that
+ * plainly recovered.
+ *
+ * Nearest-preceding degrades far more gracefully. Its own failure mode is a
+ * SWAP WITHIN a parallel batch: results A and B get attached to the wrong one
+ * of two calls issued together. The session totals stay right and only the
+ * per-signature attribution moves, which is bounded and recoverable - whereas
+ * queue poisoning silently invalidates the whole analysis.
+ *
+ * `pairedBy` records which strategy was used, so nothing downstream mistakes an
+ * inference for a fact.
  */
 
-export type PairingStrategy = "call_id" | "arrival_order";
+export type PairingStrategy = "call_id" | "nearest_preceding";
 
 export interface ActionOutcome {
   readonly action: NormalizedAgentEvent;
@@ -93,12 +109,12 @@ export function pairActionsWithOutcomes(
       }
     }
 
-    const next = pending.shift();
+    const next = pending.pop();
     if (next === undefined) {
       orphanOutcomes.push(event);
       return;
     }
-    resolved.set(next.index, { outcome: event, pairedBy: "arrival_order" });
+    resolved.set(next.index, { outcome: event, pairedBy: "nearest_preceding" });
   });
 
   const pairs = actions.map(({ action, index }): ActionOutcome => {
