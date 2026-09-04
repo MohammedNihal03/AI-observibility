@@ -118,14 +118,7 @@ const manifest = {
   dependencies: runtimeDependencies(),
   // Search terms for what it does TODAY. Codex is planned, not shipped, and a
   // keyword is a promise to whoever searched for it.
-  keywords: [
-    "claude-code",
-    "claude",
-    "ai-agent",
-    "observability",
-    "telemetry",
-    "developer-tools",
-  ],
+  keywords: ["claude-code", "claude", "ai-agent", "observability", "telemetry", "developer-tools"],
 };
 
 writeFileSync(join(outDir, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
