@@ -1,4 +1,5 @@
 import cors from "@fastify/cors";
+import fastifyStatic from "@fastify/static";
 import websocket from "@fastify/websocket";
 import { CONTRACT_VERSION, OBSERVATORY_VERSION } from "@observatory/shared";
 import Fastify, { type FastifyInstance } from "fastify";
@@ -35,6 +36,14 @@ export interface CreateAppOptions {
   database?: DatabaseHandle;
   /** Clock, injected so tests can assert a fixed `computedAt`. */
   now?: () => Date;
+  /**
+   * A built dashboard to serve alongside the API.
+   *
+   * The packaged CLI passes the exported dashboard that ships inside it, so one
+   * command and one port give a user both halves of the product. In development
+   * it is absent and the dashboard runs on its own port under `next dev`.
+   */
+  dashboardDir?: string;
 }
 
 declare module "fastify" {
@@ -46,13 +55,31 @@ declare module "fastify" {
 }
 
 /**
+ * Serves an exported dashboard from the API process.
+ *
+ * The export is plain files, so this is a static handler and a fallback: any
+ * path that is not an API route and not a file on disk gets `index.html`, which
+ * is how a client-rendered app survives someone reloading on `/compare`. API
+ * routes keep their own 404 so a mistyped endpoint returns JSON rather than a
+ * page of HTML.
+ */
+function registerDashboard(app: FastifyInstance, root: string): void {
+  app.register(fastifyStatic, { root, wildcard: false });
+
+  app.setNotFoundHandler((request, reply) => {
+    if (request.url.startsWith("/api/")) {
+      return reply.code(404).send({ error: "not_found" });
+    }
+    return reply.sendFile("index.html");
+  });
+}
+
+/**
  * Builds the Fastify instance without listening, so tests can drive it with
  * `app.inject(...)` and no open sockets.
  *
- * PHASE 7 (current): the database is opened, migrated and exposed as
- *                    `app.store`; the REST routes of BUILD.md section 32 and
- *                    the `WS /api/sessions/:id/stream` hub of section 31 are
- *                    registered.
+ * The API, the WebSocket hub and - when a built dashboard is supplied - the
+ * dashboard itself, all on one instance.
  */
 export function createApp(options: CreateAppOptions = {}): FastifyInstance {
   const config = options.config ?? loadConfig();
@@ -81,6 +108,10 @@ export function createApp(options: CreateAppOptions = {}): FastifyInstance {
 
   app.register(cors, { origin: [...config.allowedOrigins] });
   app.register(websocket);
+
+  if (options.dashboardDir !== undefined) {
+    registerDashboard(app, options.dashboardDir);
+  }
 
   // Routes are registered after the websocket plugin so `{ websocket: true }`
   // is understood by the time the stream route is declared.

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import type { CSSProperties } from "react";
 
-import { API_BASE } from "@/lib/api";
+import { apiLabel } from "@/lib/api";
 
 import { Alert, ArrowUpRight } from "./icons";
 import { Panel } from "./ui";
@@ -130,7 +130,7 @@ export function UnreachableState({ onRetry }: { onRetry: () => void }) {
 
         <p className="mt-4 max-w-[52ch] text-sm leading-relaxed text-fg-muted">
           The dashboard talks to a local server on{" "}
-          <code className="font-mono text-fg">{API_BASE}</code>. Start it and this page will fill
+          <code className="font-mono text-fg">{apiLabel()}</code>. Start it and this page will fill
           itself in.
         </p>
 

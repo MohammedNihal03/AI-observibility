@@ -27,6 +27,7 @@
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "observatory": "tsx cli/src/index.ts",
+    "package": "node scripts/package.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -b && npm run typecheck --workspace @observatory/web"
@@ -36,6 +37,7 @@
     "@types/node": "^26.4.1",
     "@vitest/coverage-v8": "^4.1.11",
     "concurrently": "^10.0.5",
+    "esbuild": "^0.28.2",
     "eslint": "^10.9.1",
     "prettier": "^3.9.6",
     "tsx": "^4.23.13",

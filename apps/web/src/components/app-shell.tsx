@@ -1,7 +1,11 @@
+"use client";
+
 import { OBSERVATORY_VERSION } from "@observatory/shared";
 import Image from "next/image";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+
+import { apiLabel } from "@/lib/api";
 
 /**
  * The frame around every view: header (BUILD.md section 36) and footer.
@@ -24,7 +28,18 @@ export function AppShell({
   toolbar?: ReactNode;
   status?: ReactNode;
 }) {
-  const apiTarget = process.env.NEXT_PUBLIC_OBSERVATORY_API ?? "http://127.0.0.1:4000";
+  /*
+   * Resolved after mount, not during render.
+   *
+   * With a same-origin build the address comes from `window.location`, which
+   * does not exist while the page is being prerendered to a file. Rendering
+   * nothing first and filling it in on the client avoids a hydration mismatch
+   * over a line of footer text.
+   */
+  const [apiTarget, setApiTarget] = useState("");
+  useEffect(() => {
+    setApiTarget(apiLabel());
+  }, []);
 
   return (
     <div className="flex min-h-[100dvh] flex-col">
@@ -81,7 +96,8 @@ export function AppShell({
             </span>
           </p>
           <p className="font-mono">
-            v{OBSERVATORY_VERSION} &middot; {apiTarget}
+            v{OBSERVATORY_VERSION}
+            {apiTarget === "" ? null : ` · ${apiTarget}`}
           </p>
         </div>
       </footer>
