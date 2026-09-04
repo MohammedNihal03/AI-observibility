@@ -5,6 +5,7 @@ import { ServerUnreachableError, type ApiClient } from "./api.js";
 import {
   doctorReport,
   openDashboard,
+  resolveDashboardUrl,
   runChecks,
   sessionsReport,
   statusReport,
@@ -158,6 +159,19 @@ describe("dashboard", () => {
     const opened: string[] = [];
     openDashboard({ url: "http://localhost:9999", open: (target) => opened.push(target) });
     expect(opened).toEqual(["http://localhost:9999"]);
+  });
+
+  it("points a packaged install at the API, which serves the dashboard itself", () => {
+    expect(resolveDashboardUrl({ packaged: true, server: "http://127.0.0.1:4000" })).toBe(
+      "http://127.0.0.1:4000",
+    );
+    expect(resolveDashboardUrl({ packaged: true, server: "http://127.0.0.1:5000" })).toBe(
+      "http://127.0.0.1:5000",
+    );
+  });
+
+  it("uses the separate dev server port from a checkout", () => {
+    expect(resolveDashboardUrl()).toBe("http://127.0.0.1:4001");
   });
 });
 

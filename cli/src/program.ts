@@ -8,6 +8,7 @@ import {
   compareReport,
   doctorReport,
   openDashboard,
+  resolveDashboardUrl,
   sessionsReport,
   statusReport,
 } from "./commands.js";
@@ -76,6 +77,12 @@ export interface ProgramOptions {
 export function buildProgram(options: ProgramOptions = {}): Command {
   const out = options.out ?? ((text: string): void => console.log(text));
   const program = new Command();
+
+  // Which dashboard address to tell the user about, given the API they are
+  // talking to. Installed, the API serves the dashboard itself; from a checkout
+  // it is the separate dev server.
+  const dashboardFor = (server: string): string =>
+    resolveDashboardUrl(resolveBundle() === null ? {} : { packaged: true, server });
 
   program
     .name("observatory")
@@ -222,7 +229,7 @@ export function buildProgram(options: ProgramOptions = {}): Command {
         }
 
         out(`Streaming a ${commandOptions.scenario} session to ${commandOptions.server}`);
-        out("Open the dashboard at http://127.0.0.1:4001 to watch it arrive.\n");
+        out(`Open the dashboard at ${dashboardFor(commandOptions.server)} to watch it arrive.\n`);
 
         const result = await streamDemo({
           scenario: commandOptions.scenario,
@@ -323,7 +330,7 @@ export function buildProgram(options: ProgramOptions = {}): Command {
         out(`  redacted  ${result.redactions} secrets before storage`);
       }
       out("");
-      out("Open the dashboard at http://127.0.0.1:4001 to see it.");
+      out(`Open the dashboard at ${dashboardFor(commandOptions.server)} to see it.`);
     });
 
   program
@@ -379,6 +386,7 @@ export function buildProgram(options: ProgramOptions = {}): Command {
           ...(commandOptions.dashboard !== undefined
             ? { dashboardUrl: commandOptions.dashboard }
             : {}),
+          ...(resolveBundle() !== null ? { packaged: true } : {}),
         }),
       );
     });

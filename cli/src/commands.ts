@@ -161,24 +161,38 @@ function openCommand(url: string): { command: string; args: readonly string[] } 
   }
 }
 
-export interface DashboardOptions {
+export interface DashboardTarget {
   readonly url?: string;
-  /** Print the URL instead of launching a browser. */
-  readonly print?: boolean;
-  readonly open?: (url: string) => void;
   /** True when the dashboard is served by the API rather than its own server. */
   readonly packaged?: boolean;
   readonly server?: string;
 }
 
-export function openDashboard(options: DashboardOptions = {}): string {
-  // A packaged install serves the dashboard from the API itself, so the API
-  // address IS the dashboard address. The dev default is the separate port the
-  // Next dev server uses.
-  const url =
-    options.url ??
+/**
+ * Where the dashboard is, for this install.
+ *
+ * A packaged install serves the dashboard from the API itself, so the API
+ * address IS the dashboard address. The dev default is the separate port the
+ * Next dev server uses. Every message that prints a dashboard URL resolves it
+ * here: hardcoding the dev port sent installed users to a port nothing is
+ * listening on.
+ */
+export function resolveDashboardUrl(target: DashboardTarget = {}): string {
+  return (
+    target.url ??
     process.env["OBSERVATORY_DASHBOARD"] ??
-    (options.packaged === true ? (options.server ?? DEFAULT_SERVER) : DEFAULT_DASHBOARD);
+    (target.packaged === true ? (target.server ?? DEFAULT_SERVER) : DEFAULT_DASHBOARD)
+  );
+}
+
+export interface DashboardOptions extends DashboardTarget {
+  /** Print the URL instead of launching a browser. */
+  readonly print?: boolean;
+  readonly open?: (url: string) => void;
+}
+
+export function openDashboard(options: DashboardOptions = {}): string {
+  const url = resolveDashboardUrl(options);
   if (options.print === true) return url;
 
   const launch =
@@ -245,7 +259,10 @@ async function checkServer(client: ApiClient): Promise<readonly Check[]> {
   }
 }
 
-async function checkDashboard(url: string): Promise<Check> {
+async function checkDashboard(url: string, packaged: boolean): Promise<Check> {
+  // An installed dashboard comes up with the API, so telling its user to run a
+  // repository script is advice they cannot follow.
+  const start = packaged ? "`observatory start`" : "`npm run dev:web`";
   try {
     const response = await fetch(url, { signal: AbortSignal.timeout(1_500) });
     return response.ok
@@ -254,14 +271,14 @@ async function checkDashboard(url: string): Promise<Check> {
           name: "Dashboard",
           status: "warn",
           detail: `${url} answered ${response.status}`,
-          remedy: "Start it with `npm run dev:web`.",
+          remedy: `Start it with ${start}.`,
         };
   } catch {
     return {
       name: "Dashboard",
       status: "warn",
       detail: `not reachable at ${url}`,
-      remedy: "Start it with `npm run dev:web`. The CLI works without it.",
+      remedy: `Start it with ${start}. The CLI works without it.`,
     };
   }
 }
@@ -352,6 +369,8 @@ function checkRedaction(): Check {
 export interface DoctorOptions extends CommandOptions {
   readonly dashboardUrl?: string;
   readonly home?: string;
+  /** True when the dashboard ships with the CLI and the API serves it. */
+  readonly packaged?: boolean;
 }
 
 /** Every check, in report order. Exposed so tests assert structure, not layout. */
@@ -363,7 +382,14 @@ export async function runChecks(options: DoctorOptions = {}): Promise<readonly C
   return [
     checkNode(),
     ...serverChecks,
-    await checkDashboard(options.dashboardUrl ?? DEFAULT_DASHBOARD),
+    await checkDashboard(
+      resolveDashboardUrl({
+        ...(options.dashboardUrl !== undefined ? { url: options.dashboardUrl } : {}),
+        ...(options.packaged === true ? { packaged: true } : {}),
+        ...(options.server !== undefined ? { server: options.server } : {}),
+      }),
+      options.packaged === true,
+    ),
     await checkWritable(
       database === undefined || database === "memory" ? "data/observatory.db" : database,
     ),
