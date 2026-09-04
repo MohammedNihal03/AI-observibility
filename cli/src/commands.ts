@@ -11,7 +11,12 @@ import {
 } from "@observatory/shared";
 import { redactionKinds } from "@observatory/telemetry";
 
-import { createApiClient, ServerUnreachableError, type ApiClient } from "./api.js";
+import {
+  createApiClient,
+  DEFAULT_SERVER,
+  ServerUnreachableError,
+  type ApiClient,
+} from "./api.js";
 
 /**
  * `status`, `sessions`, `dashboard` and `doctor` (BUILD.md section 33, Phase 10).
@@ -166,10 +171,19 @@ export interface DashboardOptions {
   /** Print the URL instead of launching a browser. */
   readonly print?: boolean;
   readonly open?: (url: string) => void;
+  /** True when the dashboard is served by the API rather than its own server. */
+  readonly packaged?: boolean;
+  readonly server?: string;
 }
 
 export function openDashboard(options: DashboardOptions = {}): string {
-  const url = options.url ?? process.env["OBSERVATORY_DASHBOARD"] ?? DEFAULT_DASHBOARD;
+  // A packaged install serves the dashboard from the API itself, so the API
+  // address IS the dashboard address. The dev default is the separate port the
+  // Next dev server uses.
+  const url =
+    options.url ??
+    process.env["OBSERVATORY_DASHBOARD"] ??
+    (options.packaged === true ? (options.server ?? DEFAULT_SERVER) : DEFAULT_DASHBOARD);
   if (options.print === true) return url;
 
   const launch =

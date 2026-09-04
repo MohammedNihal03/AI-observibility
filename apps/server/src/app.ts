@@ -44,6 +44,14 @@ export interface CreateAppOptions {
    * it is absent and the dashboard runs on its own port under `next dev`.
    */
   dashboardDir?: string;
+  /**
+   * Where the SQL migrations live.
+   *
+   * The default resolves relative to this file, which is right in a checkout
+   * and wrong in a bundle - the packaged CLI is one file, not four directories
+   * deep - so the CLI passes the copy that ships inside it.
+   */
+  migrationsFolder?: string;
 }
 
 declare module "fastify" {
@@ -92,7 +100,14 @@ export function createApp(options: CreateAppOptions = {}): FastifyInstance {
   });
 
   const ownsDatabase = options.database === undefined;
-  const database = options.database ?? createDatabase({ file: config.databaseFile });
+  const database =
+    options.database ??
+    createDatabase({
+      file: config.databaseFile,
+      ...(options.migrationsFolder !== undefined
+        ? { migrationsFolder: options.migrationsFolder }
+        : {}),
+    });
 
   const hub = createHub();
 

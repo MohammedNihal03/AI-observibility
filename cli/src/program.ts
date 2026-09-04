@@ -3,6 +3,7 @@ import { OBSERVATORY_VERSION } from "@observatory/shared";
 import { Command, InvalidArgumentError, Option } from "commander";
 
 import { DEFAULT_SERVER } from "./api.js";
+import { resolveBundle } from "./bundle.js";
 import {
   compareReport,
   doctorReport,
@@ -93,7 +94,7 @@ export function buildProgram(options: ProgramOptions = {}): Command {
     .action(async (commandOptions: StartCommandOptions) => {
       // Imported lazily: the server pulls in SQLite and Fastify, and
       // `observatory sessions` should not pay for them.
-      const { startServer } = await import("@observatory/server");
+      const { loadConfig, startServer } = await import("@observatory/server");
 
       const port =
         commandOptions.port === undefined ? undefined : Number.parseInt(commandOptions.port, 10);
@@ -101,15 +102,33 @@ export function buildProgram(options: ProgramOptions = {}): Command {
         throw new InvalidArgumentError(`--port must be a number between 1 and 65535`);
       }
 
+      // An installed CLI carries the dashboard and its migrations, and keeps
+      // its database in the user's home rather than inside an installation that
+      // an upgrade will replace.
+      const bundle = resolveBundle();
+      const config =
+        bundle === null || process.env["OBSERVATORY_DB"] !== undefined
+          ? undefined
+          : { ...loadConfig(), databaseFile: bundle.databaseFile };
+
       const server = await startServer({
         logger: commandOptions.quiet !== true,
         ...(port !== undefined ? { port } : {}),
         ...(commandOptions.host !== undefined ? { host: commandOptions.host } : {}),
+        ...(config !== undefined ? { config } : {}),
+        ...(bundle !== null
+          ? { dashboardDir: bundle.dashboardDir, migrationsFolder: bundle.migrationsFolder }
+          : {}),
       });
 
-      out(`Observatory API listening on ${server.url}`);
+      out(
+        bundle === null
+          ? `Observatory API listening on ${server.url}`
+          : `Observatory running on ${server.url}`,
+      );
       out(`Database ${server.app.database.file}`);
       out("");
+      if (bundle !== null) out(`  Dashboard   ${server.url}`);
       out("  observatory demo --stream    generate a simulated session");
       out("  observatory import           observe a real Claude Code session");
       out("  observatory dashboard        open the dashboard");
@@ -162,6 +181,7 @@ export function buildProgram(options: ProgramOptions = {}): Command {
       const url = openDashboard({
         ...(commandOptions.url !== undefined ? { url: commandOptions.url } : {}),
         ...(commandOptions.print === true ? { print: true } : {}),
+        ...(resolveBundle() !== null ? { packaged: true, server: DEFAULT_SERVER } : {}),
       });
       out(commandOptions.print === true ? url : `Opening ${url}`);
     });
