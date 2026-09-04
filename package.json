@@ -1,6 +1,6 @@
 {
   "name": "ai-agent-observatory",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Local-first behavioral observability for Claude Code. See whether your AI coding agent is improving, stuck, or repeating itself - and why.",
   "license": "MIT",
