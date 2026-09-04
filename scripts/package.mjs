@@ -130,6 +130,9 @@ const manifest = {
 
 writeFileSync(join(outDir, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 cpSync(join(root, "README.md"), join(outDir, "README.md"));
+// npm ships LICENSE regardless of `files`, but only if it is actually here -
+// and the manifest claims MIT, so the text has to travel with it.
+cpSync(join(root, "LICENSE"), join(outDir, "LICENSE"));
 
 console.log(`\nPackaged ${manifest.name}@${manifest.version} into dist-package/`);
 console.log(`  dependencies: ${Object.keys(manifest.dependencies).join(", ")}`);
