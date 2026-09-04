@@ -72,7 +72,12 @@ declare module "fastify" {
  * page of HTML.
  */
 function registerDashboard(app: FastifyInstance, root: string): void {
-  app.register(fastifyStatic, { root, wildcard: false });
+  // `extensions: ["html"]` is what makes `/compare` serve `compare.html`.
+  // Without it the export's page files are unreachable by their route names,
+  // every one of them missed, and the catch-all below quietly returned the
+  // dashboard's index for every deep link - so `/compare` rendered the session
+  // page and looked merely wrong rather than broken.
+  app.register(fastifyStatic, { root, wildcard: false, extensions: ["html"] });
 
   app.setNotFoundHandler((request, reply) => {
     if (request.url.startsWith("/api/")) {
