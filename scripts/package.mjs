@@ -128,5 +128,7 @@ cpSync(join(root, "README.md"), join(outDir, "README.md"));
 console.log(`\nPackaged ${manifest.name}@${manifest.version} into dist-package/`);
 console.log(`  dependencies: ${Object.keys(manifest.dependencies).join(", ")}`);
 console.log(`  dashboard:    ${webPackage.name} static export`);
-console.log("\n  npm pack dist-package          # make a tarball");
+// The `./` is not optional: `npm pack dist-package` treats the argument as a
+// package NAME and downloads whatever stranger has published under it.
+console.log("\n  npm pack ./dist-package        # make a tarball");
 console.log("  npm install -g ./dist-package  # install it locally");

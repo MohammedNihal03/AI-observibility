@@ -3715,7 +3715,7 @@ import fastifyStatic from "@fastify/static";
 import websocket from "@fastify/websocket";
 import Fastify, {} from "fastify";
 function registerDashboard(app, root) {
-  app.register(fastifyStatic, { root, wildcard: false });
+  app.register(fastifyStatic, { root, wildcard: false, extensions: ["html"] });
   app.setNotFoundHandler((request2, reply) => {
     if (request2.url.startsWith("/api/")) {
       return reply.code(404).send({ error: "not_found" });
