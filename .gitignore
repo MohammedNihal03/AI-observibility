@@ -24,3 +24,7 @@ npm-debug.log*
 .agents/skills/brandkit/SKILL.md
 /.agents/skills/design-taste-frontend
 *.md
+
+# Build output: the publishable bundle and the exported dashboard.
+dist-package/
+apps/web/out/

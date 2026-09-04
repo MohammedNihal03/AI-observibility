@@ -1,3 +1,6 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import websocket from "@fastify/websocket";
@@ -72,17 +75,36 @@ declare module "fastify" {
  * page of HTML.
  */
 function registerDashboard(app: FastifyInstance, root: string): void {
-  // `extensions: ["html"]` is what makes `/compare` serve `compare.html`.
-  // Without it the export's page files are unreachable by their route names,
-  // every one of them missed, and the catch-all below quietly returned the
-  // dashboard's index for every deep link - so `/compare` rendered the session
-  // page and looked merely wrong rather than broken.
-  app.register(fastifyStatic, { root, wildcard: false, extensions: ["html"] });
+  app.register(fastifyStatic, { root, wildcard: false });
 
   app.setNotFoundHandler((request, reply) => {
     if (request.url.startsWith("/api/")) {
       return reply.code(404).send({ error: "not_found" });
     }
+
+    /*
+     * `/compare` has to serve `compare.html`.
+     *
+     * The export names each page file after its route, and `wildcard: false`
+     * makes the static plugin register one route per FILE - so `/compare.html`
+     * resolves and `/compare` does not. The plugin's own `extensions` option
+     * cannot help, because it runs inside a route that was never matched.
+     *
+     * Getting this wrong is quiet rather than loud: every deep link fell
+     * through to the catch-all and rendered the dashboard's index, so
+     * `/compare` returned HTTP 200 and showed the session page.
+     */
+    const path = (request.url.split("?")[0] ?? "/").replace(/^\/+|\/+$/gu, "");
+    const candidate = `${path}.html`;
+
+    // `sendFile` refuses to escape the root, but the existence check below
+    // would follow `..` happily, so it is rejected before being used.
+    if (path !== "" && !path.includes("..") && existsSync(join(root, candidate))) {
+      return reply.sendFile(candidate);
+    }
+
+    // A genuinely unknown path gets the app, which is what lets a
+    // client-rendered route survive a reload.
     return reply.sendFile("index.html");
   });
 }

@@ -3710,15 +3710,22 @@ var init_routes = __esm({
 });
 
 // apps/server/dist/app.js
+import { existsSync as existsSync2 } from "node:fs";
+import { join as join3 } from "node:path";
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import websocket from "@fastify/websocket";
 import Fastify, {} from "fastify";
 function registerDashboard(app, root) {
-  app.register(fastifyStatic, { root, wildcard: false, extensions: ["html"] });
+  app.register(fastifyStatic, { root, wildcard: false });
   app.setNotFoundHandler((request2, reply) => {
     if (request2.url.startsWith("/api/")) {
       return reply.code(404).send({ error: "not_found" });
+    }
+    const path = (request2.url.split("?")[0] ?? "/").replace(/^\/+|\/+$/gu, "");
+    const candidate = `${path}.html`;
+    if (path !== "" && !path.includes("..") && existsSync2(join3(root, candidate))) {
+      return reply.sendFile(candidate);
     }
     return reply.sendFile("index.html");
   });

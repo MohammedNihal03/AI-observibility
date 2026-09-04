@@ -11,12 +11,7 @@ import {
 } from "@observatory/shared";
 import { redactionKinds } from "@observatory/telemetry";
 
-import {
-  createApiClient,
-  DEFAULT_SERVER,
-  ServerUnreachableError,
-  type ApiClient,
-} from "./api.js";
+import { createApiClient, DEFAULT_SERVER, ServerUnreachableError, type ApiClient } from "./api.js";
 
 /**
  * `status`, `sessions`, `dashboard` and `doctor` (BUILD.md section 33, Phase 10).

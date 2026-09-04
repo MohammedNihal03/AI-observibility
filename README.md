@@ -1,295 +1,211 @@
 # AI Agent Observatory
 
-**TensorBoard for AI coding agents.**
+**See how your AI coding agent is actually behaving.**
 
-A local-first developer tool that answers one question about an AI coding agent such as Claude Code
-or Codex:
+You just spent two hours with Claude Code. Did it work steadily toward the goal, or did it spend
+forty minutes re-editing the same file and re-running the same failing test? You can scroll back
+through the transcript to find out. Or you can run one command.
 
-> Is my agent behaving well — and if not, why?
+```bash
+observatory import
+```
 
-It measures **observable agent behavior**: tool calls, failures, repeated actions, recovery,
-correction loops, token and context usage. Every score comes with the reasons behind it.
+The Observatory reads the session your agent already recorded on disk and answers one question:
 
-> **What this is not.** The Observatory does not measure neural-network learning. There are no
-> weights, gradients, loss values or optimizer state here, because Claude Code and Codex do not
-> expose them to an external local application. "Behavioral learning" means _the agent's observable
-> behavior improved during this session_ — nothing more. See [docs/scoring.md](docs/scoring.md).
+> **Is my agent behaving well — and if not, why?**
+
+Everything runs on your machine. No account, no API key, nothing uploaded.
 
 ---
 
-## Status
+## What you get
 
-Under active construction, one phase at a time (see `Build.md`, section 58).
+A local dashboard that shows what your agent did, how healthy the session was, and why.
 
-| Phase                     | State       |
-| ------------------------- | ----------- |
-| 0 — Repository inspection | done        |
-| 1 — Monorepo foundation   | done        |
-| 2 — Event system          | done        |
-| 3 — SQLite persistence    | done        |
-| 4 — Metrics engine        | done        |
-| 5 — Behavioral engine     | done        |
-| 6 — Demo generator        | done        |
-| 7 — REST API + WebSocket  | done        |
-| 8 — Dashboard             | done        |
-| 9 — Real-time dashboard   | done        |
-| 10 — CLI                  | done        |
-| 11 — Claude Code adapter  | done        |
-| 12 — Codex adapter        | not started |
-| 13 — Polish               | done        |
-| V2 — comparison, strategy | partly done |
+![The Observatory dashboard: an agent health score of 74 out of 100 marked improving, the five
+measured components behind it, a chart of health across the session, and a timeline of every tool
+call and its outcome](docs/images/dashboard.png)
 
-Everything works except the Codex adapter: the API, the live dashboard, the full CLI, and
-`observatory import`, which observes **real Claude Code sessions**. Codex sessions are readable in
-principle — `observatory doctor` says so rather than pretending otherwise — but nothing reads them
-yet.
-
----
-
-## Requirements
-
-- **Node.js 20.11 or newer** (developed on 22.21.0)
-- **npm 10 or newer** (this repo uses npm workspaces; pnpm and yarn are not configured)
-
-No cloud account. No API key. Nothing is uploaded anywhere.
-
----
-
-## Setup
-
-```bash
-npm install
-```
-
-That is the whole install. `better-sqlite3` is a native module; it installs from a prebuilt binary
-on common platforms and needs no compiler toolchain.
-
-## Running it
-
-```bash
-npm run dev
-```
-
-This builds the workspace packages, then starts three watchers together:
-
-| Process          | URL                   | What it is                           |
-| ---------------- | --------------------- | ------------------------------------ |
-| API server       | http://127.0.0.1:4000 | Fastify REST + (later) WebSocket hub |
-| Dashboard        | http://127.0.0.1:4001 | Next.js dashboard                    |
-| Package compiler | —                     | `tsc -b --watch` over `packages/*`   |
-
-Open **http://127.0.0.1:4001**.
-
-Both servers bind to the loopback interface only, so nothing on your network can reach your
-telemetry. Ports 4000/4001 were chosen deliberately to avoid the crowd on port 3000; override with
-`OBSERVATORY_PORT` and `next dev --port`.
-
-Check the API is alive:
-
-```bash
-curl http://127.0.0.1:4000/api/health
-# {"status":"ok","version":"0.1.0","contractVersion":1,"time":"...","uptimeSeconds":1}
-```
-
-### Running one side only
-
-```bash
-npm run dev:server
-npm run dev:web
-```
-
-## The CLI
-
-```bash
-node cli/dist/index.js --help     # after `npm run build:packages`
-npx tsx cli/src/index.ts --help   # straight from source
-```
+And the same answer in your terminal, if you would rather not leave it:
 
 ```
-observatory start       Start the local API server
-observatory status      What the Observatory is doing right now
-observatory sessions    List recorded sessions with their scores
-observatory dashboard   Open the dashboard in a browser
-observatory demo        Generate and analyze a simulated session
-observatory import      Observe a real Claude Code session
-observatory compare     Compare two sessions, or group them by model or prompt
-observatory doctor      Check the local environment and integrations
-```
+  AGENT HEALTH          65 / 100   stable (3/5 components measured)
+  BEHAVIORAL LEARNING   34 / 100   ▼ DEGRADING
+  DEGRADATION           27 / 100
 
-To type `observatory` rather than the whole path:
+  Tokens 148M   Actions 396   Errors 3   Recovery 33%   Repetition 23%
 
-```bash
-npm run build:packages && npm link --workspace @observatory/cli
-```
+  WINDOW      actions   errors   recovery   repetition
+  early          132       1%       100%          16%
+  middle         132       1%         0%          25%
+  recent         132       1%         0%          22%
 
-`npm run observatory -- <command>` works without linking anything.
-
-### A first run
-
-```bash
-observatory start          # terminal 1: the API
-npm run dev:web            # terminal 2: the dashboard
-observatory import         # terminal 3: observe your last Claude Code session
-observatory dashboard      # open it
-```
-
-`observatory doctor` reports on all of the above at once, including whether Claude Code has written
-any transcripts to read:
-
-```
-  ✓ Node.js           v22.21.0 on win32 x64
-  ✓ API server        http://127.0.0.1:4000 · 2 sessions
-  ✓ Claude Code       104 sessions, newest just now
-  ⚠ Codex             adapter not implemented (Phase 12)
-  ✓ Scoring config    weights valid · 5 health components
-  ✓ Secret redaction  12 credential formats recognised
-```
-
-## Seeing it work without an agent: `observatory demo`
-
-With `npm run dev` running, stream a simulated session into the dashboard and watch it fill in:
-
-```bash
-npx tsx cli/src/index.ts demo --scenario improving --stream
-```
-
-The events are replayed one at a time into the API. On each arrival the server re-runs the engine
-and pushes a new snapshot down the WebSocket, so the health score, the chart, the signals and the
-timeline all move while you watch. The header shows **● LIVE** for exactly as long as the socket is
-open and the session is still running — never a moment longer.
-
-Add `--speed <n>` to replay faster or slower (default 6×), and `--server <url>` to point at a
-different API.
-
-Without `--stream` the demo runs entirely offline — generate, analyze, print — which needs no server
-at all:
-
-```bash
-npx tsx cli/src/index.ts demo --scenario stable
-npx tsx cli/src/index.ts demo --scenario degrading
-```
-
-Either way the session goes through the **real** pipeline — validation, normalization, redaction,
-metrics, behavioral analysis — and the offline report prints the verdict with the reasons behind it:
-
-```
-  AGENT HEALTH          74 / 100   stable (5/5 components measured)
-  BEHAVIORAL LEARNING   73 / 100   ▲ IMPROVING
-  DEGRADATION           28 / 100
-
-  WINDOW      actions   errors   recovery   repetition   on-goal
-  early          12      60%         0%          33%       75%
-  middle         12      33%       100%          17%       83%
-  recent         12      17%       100%          17%       83%
-
-  WHY THE AGENT IS IMPROVING
-    ✓ 4 successful correction loops
-    ✓ Recovery rate increased 100.0 points
+  WHY THE AGENT IS DEGRADING
+    ✗ Recovery rate decreased 100%
+    ✗ Repetition increased 39%
     ⚠ 1 retry with no change in between
+
+  SIGNALS
+    ⚠ apps/web/src/components/performance-chart.tsx ran 10 times
+    ⚠ apps/server/src/app.ts ran 8 times
 ```
 
-| Scenario    | What the simulated agent does                                             | Verdict     |
-| ----------- | ------------------------------------------------------------------------- | ----------- |
-| `improving` | thrashes, investigates, then recovers from everything                     | ▲ IMPROVING |
-| `stable`    | one failure per stretch, corrected each time, no trend either way         | ● STABLE    |
-| `degrading` | the same test fails seven times; edits stop helping; drifts off the goal  | ▼ DEGRADING |
-
-Other flags: `--seed <value>` (any seed produces the same three verdicts, only the file and command
-names change), `--started-at <iso>`, `--json` for the full analysis, and `--events` for the raw
-events as NDJSON.
-
-**Simulated data is always labelled as simulated.** The session id starts with `demo_`, every event
-carries `metadata.simulated = true`, and both the report and the dashboard say so. It is never
-presented as observed agent telemetry.
+That is a real session — the one that built this tool. It caught the author editing the same
+component ten times while fighting a rendering bug, and called the session degrading for it. Every
+number comes with the reason behind it; you should never see a score without an explanation.
 
 ---
 
-## Observing a real agent: `observatory import`
+## Quickstart
 
-Claude Code appends a JSONL transcript of every session to
-`~/.claude/projects/<project>/<sessionId>.jsonl` as it works. The adapter reads it — no hook, no
-configuration, no cooperation from the agent required.
+**You need Node.js 20.11 or newer.** Nothing else.
 
 ```bash
-npx tsx cli/src/index.ts import --list          # what is on this machine
-npx tsx cli/src/index.ts import                 # the newest session
-npx tsx cli/src/index.ts import --session 5f80  # a specific one (prefix is enough)
-npx tsx cli/src/index.ts import --watch         # keep following a session as it runs
+npm install -g ai-agent-observatory
 ```
 
-Re-running is safe: the server is asked how many events it already holds and only the remainder is
-sent, which is also how `--watch` appends.
+> **Not on npm yet.** Until it is published, install it from a clone instead — same result, one
+> extra minute:
+>
+> ```bash
+> git clone <this repo> && cd ai-agent-observatory
+> npm install && npm run package
+> npm install -g ./dist-package
+> ```
+>
+> The `./` matters: without it npm looks for a package by that name in the registry.
 
-### What leaves your machine: nothing
-
-The import sends the **shape** of the work, never its content:
-
-| Sent                                             | Not sent                                        |
-| ------------------------------------------------ | ----------------------------------------------- |
-| Which tool ran, and its call id                  | Prompt text, assistant replies, thinking blocks |
-| The file path that was read or edited            | File contents, diffs, `old_string`/`new_string` |
-| The command line (capped at 500 characters)      | Command output, stdout, stderr                  |
-| Success or failure, from Claude Code's `is_error`| Error messages                                  |
-| Token counts per API response                    | —                                               |
-
-The command cap is not arbitrary. A heredoc is a command line too: measured on a real session, the
-median command was 209 characters but the longest was 2,243 characters of embedded Python. Commands
-are truncated with their original length appended, so long ones stay distinguishable from each other
-without carrying a file inside them.
-
-Everything still goes through redaction before storage, but the cheapest way not to leak a secret is
-not to carry it.
-
-### What is real, and what stays unknown
-
-| Measure                          | With Claude Code                                        |
-| -------------------------------- | ------------------------------------------------------- |
-| Failures, recovery, correction loops | **Real.** `is_error` makes failure deterministic     |
-| Files read / modified            | **Real**, counted as distinct paths by semantic type     |
-| Tokens                           | **Real**, deduplicated by `message.id`                   |
-| Repetition, health, learning      | **Real** — the same engine, on real events               |
-| Context utilization              | **Unknown.** Claude Code never states the model's limit  |
-
-Sub-agent work (`isSidechain`) is left out of the parent session by default: a subagent is a
-different agent, and blending its tool calls into the parent's would average two behaviours into one
-score. `--include-sidechains` opts in.
-
----
-
-## The API
-
-The dashboard is a client of the local server like any other; it computes nothing itself.
-
-| Endpoint                          | What it does                                              |
-| --------------------------------- | --------------------------------------------------------- |
-| `POST /api/sessions`              | Create a session                                          |
-| `GET /api/sessions`               | List sessions with their headline scores                  |
-| `GET /api/sessions/:id`           | The full snapshot the dashboard renders                   |
-| `PATCH /api/sessions/:id`         | End a session, or correct its goal/model                  |
-| `POST /api/sessions/:id/events`   | Ingest one event or a batch                               |
-| `GET /api/sessions/:id/metrics`   | Metrics, the three windows, and the progress series       |
-| `GET /api/sessions/:id/health`    | Health, learning and degradation — with their reasons     |
-| `GET /api/sessions/:id/timeline`  | The activity rows                                         |
-| `GET /api/sessions/:id/events`    | The stored events themselves                              |
-| `WS /api/sessions/:id/stream`     | Live updates: `hello`, `event`, `snapshot`, `session_ended` |
-
-Ingestion follows one order, deliberately: **validate → normalize → redact → store → analyze →
-broadcast**. Redaction sits upstream of both the database and the socket, so neither can be handed a
-credential. The broadcast carries a freshly recomputed snapshot rather than a diff, so the client
-never has to hold a second opinion about what the numbers are.
-
----
-
-## Comparison and repeated strategies (V2)
-
-### `observatory compare`
+Start it:
 
 ```bash
-observatory compare <session-a> <session-b>   # two sessions, side by side
-observatory compare --by model                # every session, grouped by model
-observatory compare --by goal                 # ... by prompt
-observatory compare --by source               # ... by agent
+observatory start
 ```
+
+```
+Observatory running on http://127.0.0.1:4000
+Database C:\Users\you\.observatory\observatory.db
+
+  Dashboard   http://127.0.0.1:4000
+```
+
+Open **http://127.0.0.1:4000**. It will be empty — nothing has been recorded yet.
+
+In a second terminal, bring in a session you have already run:
+
+```bash
+observatory import
+```
+
+Refresh the dashboard. That is the whole loop.
+
+**No Claude Code sessions yet?** See it work with simulated data instead:
+
+```bash
+observatory demo --scenario improving --stream
+```
+
+Watch the dashboard while that runs — the numbers, the chart and the timeline fill in live.
+
+---
+
+## What the numbers mean
+
+Three scores, and they answer different questions. A session can be at 82 and going nowhere, or at
+55 and climbing fast.
+
+### Agent health — *how is it doing?*
+
+**0–100.** A weighted average of five things, each measured, each shown to you:
+
+| Component            | Weight | What it measures                                        |
+| -------------------- | ------ | ------------------------------------------------------- |
+| Recovery             | 30%    | When something failed, did the agent fix it?            |
+| Tool efficiency      | 20%    | How many tool calls succeeded                           |
+| Repetition avoidance | 20%    | How much of the work was doing something already done   |
+| Goal adherence       | 15%    | How much of the work related to what you asked for      |
+| Context headroom     | 15%    | How much of the context window is still free            |
+
+| Score  | Band      |
+| ------ | --------- |
+| 80–100 | healthy   |
+| 60–79  | stable    |
+| 40–59  | warning   |
+| 0–39   | degrading |
+
+A component that cannot be measured is **excluded**, not counted as zero — a session with no
+failures has no recovery rate, and scoring that as 0 would rank "never failed" below "failed and
+recovered". The dashboard shows you how many of the five were actually measured.
+
+### Behavioral learning — *which way is it going?*
+
+The session is split into three windows by action count — early, middle, recent — and compared.
+**Improving** means errors fell, recovery rose, repetition dropped. **Degrading** means the reverse.
+**Stable** means no meaningful trend either way.
+
+> This is **not** model learning. There are no weights, gradients or loss values here. Claude Code
+> does not expose them, and this tool does not pretend to. "Learning" means the agent's *observable
+> behavior* got better during this session — nothing more.
+
+### Degradation — *what is going wrong?*
+
+**0–100**, from seven specific signals: the same action failing repeatedly, rising error rate,
+falling recovery, correction loops that keep failing, drifting off the goal, and context pressure.
+Each one is listed with the measurement behind it.
+
+### What to do about it
+
+| You see                              | It usually means                                                     |
+| ------------------------------------ | -------------------------------------------------------------------- |
+| **Repetition high, recovery low**    | The agent is stuck. Give it new information, not another retry.       |
+| **"failed N times in a row"**        | It is retrying without changing anything. Intervene.                  |
+| **"tried N times, never worked"**    | The whole approach is wrong, not the details. Redirect it.            |
+| **Context utilization above 90%**    | It is running out of room. Start a fresh session.                     |
+| **Goal adherence falling**           | It has wandered. Restate the goal.                                    |
+| **Health high, learning stable**     | Nothing is wrong. Steady competent work looks exactly like this.      |
+
+---
+
+## Commands
+
+| Command                | What it does                                                    |
+| ---------------------- | --------------------------------------------------------------- |
+| `observatory start`    | Start everything — API, live updates and dashboard, on one port  |
+| `observatory import`   | Read a real Claude Code session and analyze it                   |
+| `observatory sessions` | List what has been recorded                                      |
+| `observatory status`   | What the Observatory is doing right now                          |
+| `observatory compare`  | Compare two sessions, or group them by model or prompt           |
+| `observatory demo`     | Generate a simulated session (no agent required)                 |
+| `observatory dashboard`| Open the dashboard in a browser                                  |
+| `observatory doctor`   | Check that everything is set up correctly                        |
+
+Every command takes `--help`.
+
+### Importing sessions
+
+```bash
+observatory import --list           # what is on this machine
+observatory import                  # the newest session
+observatory import --session 5f80   # a specific one (a prefix is enough)
+observatory import --watch          # follow a session as it runs, live
+observatory import --project myapp  # only sessions from one project
+```
+
+Re-running is safe. The Observatory asks how much it already has and sends only what is new — which
+is also how `--watch` keeps up with a running agent.
+
+### Comparing sessions
+
+```bash
+observatory compare <session-a> <session-b>   # side by side
+observatory compare --by model                # grouped by model
+observatory compare --by goal                 # grouped by prompt
+```
+
+![Two sessions side by side: every measure with its value on each side and whether the change is
+better or worse, plus the behaviour signals that only one of the two sessions
+raised](docs/images/compare.png)
+
+The same thing in the terminal:
 
 ```
   left    demo_degrading_BA7E   (degrading)
@@ -305,98 +221,201 @@ observatory compare --by source               # ... by agent
     - npm test -- session failed 7 times in a row
 ```
 
-Grouped comparison reports **medians, not means** — one three-hour disaster
-should not define a model — and every row carries its session count, because a
-comparison drawn from one session each is a data point, not a finding. It is
-observational throughout: two sessions differ in the model *and* the task *and*
-the day, so the output says "difference", never "improvement".
+Grouped comparison uses **medians, not averages** — one disastrous session should not define a
+model — and shows the session count on every row, because a comparison built from one session each
+is a data point, not a finding. It shows you differences; it does not claim causes. Two sessions
+differ in the model *and* the task *and* the day.
 
-### Repeated strategies
+### Trying it without an agent
 
-Repetition detection compares single actions by exact signature. It catches
-`npm test` run three times. It cannot catch this:
-
-```
-edit auth.ts → npm test -- auth   (fails)
-edit user.ts → npm test -- user   (fails)
-edit role.ts → npm test -- role   (fails)
+```bash
+observatory demo --scenario improving --stream    # watch it arrive live
+observatory demo --scenario degrading             # or just print the report
 ```
 
-Six actions, every signature distinct, repetition rate zero — and an agent
-applying the same failing approach three times. Strategy detection generalizes
-each action (`src/auth/token.ts` → `edit:src/auth`, `npm test -- auth` →
-`run:npm test`) and looks for repeated *sequences*. A strategy that has been
-tried repeatedly and has never once worked is raised as a signal.
+Three scenarios, each with a known verdict:
 
-**Not embeddings**, and the code says so. Generalizing is a coarser comparison
-rather than a smarter one: two edits in the same directory count as the same
-move even when they are unrelated. The goal-drift detector is likewise token
-matching with stem and prefix tolerance — enough to connect a goal that says
-"authentication" to a file called `auth.ts`, not enough to connect "login" to
-`session-store.ts`. Both sit behind interfaces so an embedding backend can
-replace them without touching anything else.
+| Scenario    | What the simulated agent does                                       | Verdict     |
+| ----------- | -------------------------------------------------------------------- | ----------- |
+| `improving` | thrashes, investigates, then recovers from everything                | ▲ IMPROVING |
+| `stable`    | one failure per stretch, corrected each time, no trend               | ● STABLE    |
+| `degrading` | the same test fails seven times; edits stop helping; drifts off task  | ▼ DEGRADING |
 
----
-
-## Development commands
-
-| Command                  | What it does                                               |
-| ------------------------ | ---------------------------------------------------------- |
-| `npm run dev`            | Everything, in watch mode                                  |
-| `npm run build`          | Build packages, server, CLI and the dashboard              |
-| `npm run build:packages` | `tsc -b` over the TypeScript project graph                 |
-| `npm run typecheck`      | Type-check every workspace, dashboard included             |
-| `npm test`               | Vitest, run against package **source** (no build required) |
-| `npm run test:watch`     | Vitest in watch mode                                       |
-| `npm run lint`           | ESLint over the repo                                       |
-| `npm run format`         | Prettier, write                                            |
-| `npm run clean`          | Remove TypeScript build output                             |
-| `npm run db:generate`    | Generate a migration from the schema                       |
-| `npm run db:studio`      | Browse the local database in Drizzle Studio                |
-
----
-
-## Repository layout
-
-```
-apps/
-  web/          Next.js dashboard
-  server/       Fastify API + WebSocket hub
-packages/
-  shared/       Event, session, metric and health contracts (Zod) + scoring config
-  telemetry/    Validation, normalization, secret redaction, event processing
-  metrics/      Deterministic metric computation (pure functions)
-  behavior/     Repetition, correction loops, recovery, health, learning, degradation
-  collectors/   Agent adapters: Claude Code, Codex, generic, demo
-cli/            The `observatory` command
-database/
-  migrations/   SQLite migrations
-docs/           Architecture, scoring and integration notes
-```
-
-The analytics packages (`metrics`, `behavior`) are pure and synchronous: events in, scores and
-reasons out. They never touch the database, the network, or an LLM. That is what makes the results
-reproducible and testable — and it means adding a new agent adapter never touches the scoring
-engine.
+Simulated sessions are **always labelled as simulated** — in the session id, on every event, and in
+the dashboard. They are never presented as something your agent did.
 
 ---
 
 ## Privacy
 
-- Everything runs on your machine. There is no server component that phones home.
-- Secret redaction runs **before** anything is written to disk (`packages/telemetry`).
-- The database lives at `data/observatory.db` and is git-ignored, along with every `*.sqlite`/`*.db`
-  file. Override the location with `OBSERVATORY_DB`.
-- Events are stored as structured columns plus a redacted, size-capped metadata payload (4 KB by
-  default). The Observatory never stores raw transcript content or command output — the event
-  contract has no field for it.
+This is the part worth reading carefully, because the Observatory reads your agent's transcripts.
 
-## Further reading
+**Nothing leaves your machine.** There is no cloud, no telemetry, no phone-home. The server binds to
+`127.0.0.1` only, so nothing on your network can reach it either.
+
+**And most of the transcript is never even read into the tool.** The import takes the *shape* of the
+work, not its content:
+
+| Recorded                                    | Never recorded                                   |
+| ------------------------------------------- | ------------------------------------------------ |
+| Which tool ran                              | Your prompts and the agent's replies             |
+| The file path that was read or edited       | File contents and diffs                          |
+| The command line (capped at 500 characters) | Command output, stdout, stderr                   |
+| Whether it succeeded or failed              | Error messages                                   |
+| Token counts                                | —                                                |
+
+Anything that does get stored passes through secret redaction first — API keys, tokens, passwords
+and private keys in twelve known formats — and redaction runs *before* the database write, so an
+unredacted value never touches disk.
+
+Your data lives in one place:
+
+```
+~/.observatory/observatory.db
+```
+
+Delete that file and everything is gone. Point `OBSERVATORY_DB` somewhere else to move it.
+
+---
+
+## What it can and cannot see
+
+Being straight about the limits, because a number presented confidently is worse than no number.
+
+**Fully measured with Claude Code:**
+
+- Failures and recoveries — Claude Code marks failed tool calls explicitly, so this is a fact, not a guess
+- Files read and modified, counted as distinct paths
+- Token usage, deduplicated per API response
+- Repetition, correction loops, and every score built on them
+
+**Not available:**
+
+- **Context utilization.** Claude Code records the model but never its context limit, so the
+  Observatory shows "no window reported" rather than inventing a percentage. Codex *does* report it.
+- **Cost.** Shown when the agent recorded it, never estimated from a pricing table that would go
+  stale.
+- **Codex sessions.** Codex writes readable logs and support is planned, but nothing reads them yet.
+  `observatory doctor` says so plainly.
+
+**Deliberately approximate:**
+
+Goal adherence is word matching — it connects a goal that says "authentication" to a file called
+`auth.ts`, but it will not connect "login" to `session-store.ts`. That is why the signal is called
+*possible* goal drift and carries little weight. Same for repeated-strategy detection: it compares
+generalized actions, not meanings.
+
+The scores themselves are **product judgements, not science**. The weights above are one reasonable
+opinion about what good agent behavior looks like. [docs/scoring.md](docs/scoring.md) explains every
+one and how to change it.
+
+---
+
+## Troubleshooting
+
+**`observatory` is not recognised**
+npm's global install directory is not on your `PATH`. Find it with `npm prefix -g` and add it (the
+executables are in that folder on Windows, and in its `bin` subfolder on macOS and Linux). Or skip
+the `PATH` entirely and use `npx ai-agent-observatory <command>`.
+
+**The dashboard says "The Observatory API is not answering"**
+`observatory start` is not running, or it is on a different port. Run `observatory doctor`.
+
+**`observatory import` says no transcripts found**
+Claude Code writes them the first time you run a session. Confirm with `observatory import --list`.
+If that is empty, no sessions exist on this machine yet.
+
+**Port 4000 is already in use**
+
+```bash
+observatory start --port 4100
+```
+
+**The dashboard is empty after importing**
+Check that the import reported events, and that `observatory sessions` lists the session. If it does,
+refresh the page.
+
+**Start over**
+
+```bash
+rm ~/.observatory/observatory.db      # deletes every recorded session
+```
+
+**Uninstall**
+
+```bash
+npm uninstall -g ai-agent-observatory
+rm -rf ~/.observatory
+```
+
+---
+
+## For contributors
+
+```bash
+git clone <this repo> && cd ai-agent-observatory
+npm install
+npm run dev        # API on :4000, dashboard on :4001, packages in watch mode
+npm test           # 595 tests, no build required
+```
+
+In development the dashboard runs on its own port under `next dev`, which is why it is `:4001` there
+and `:4000` once installed. To build the installable package:
+
+```bash
+npm run package                # -> dist-package/
+npm install -g ./dist-package  # install that build
+```
+
+| Command                  | What it does                                       |
+| ------------------------ | -------------------------------------------------- |
+| `npm run dev`            | Everything, in watch mode                          |
+| `npm test`               | Vitest against package source                      |
+| `npm run typecheck`      | Type-check every workspace, dashboard included      |
+| `npm run lint`           | ESLint over the repo                               |
+| `npm run package`        | Build the single publishable package               |
+| `npm run db:studio`      | Browse the local database                          |
+
+```
+apps/web/          Next.js dashboard (exported to static files when packaged)
+apps/server/       Fastify API + WebSocket hub
+packages/shared/   Contracts (Zod) and the scoring configuration
+packages/telemetry/  Validation, normalization, secret redaction
+packages/metrics/  Metric computation — pure functions
+packages/behavior/ Repetition, recovery, health, learning, degradation
+packages/collectors/ Agent adapters and the demo generator
+cli/               The `observatory` command
+```
+
+The analytics packages are pure and synchronous: events in, scores and reasons out. No database, no
+network, no LLM. That is what makes results reproducible, and it means adding an agent adapter never
+touches the scoring engine.
+
+### The API
+
+The dashboard is an ordinary client of the local server and computes nothing itself.
+
+| Endpoint                         | What it does                                  |
+| -------------------------------- | --------------------------------------------- |
+| `POST /api/sessions`             | Create a session                              |
+| `GET /api/sessions`              | List sessions with their headline scores      |
+| `GET /api/sessions/:id`          | The full snapshot the dashboard renders       |
+| `POST /api/sessions/:id/events`  | Ingest one event or a batch                   |
+| `GET /api/sessions/:id/metrics`  | Metrics, windows and the progress series      |
+| `GET /api/sessions/:id/health`   | Scores — with the reasons behind them         |
+| `GET /api/sessions/:id/timeline` | The activity rows                             |
+| `GET /api/compare`               | Compare two sessions, or group them           |
+| `WS /api/sessions/:id/stream`    | Live updates while a session runs             |
+
+Any tool can be observed without an adapter by posting events to that API.
+
+### Further reading
 
 - [docs/architecture.md](docs/architecture.md) — how a raw event becomes a score
-- [docs/scoring.md](docs/scoring.md) — what every score means, and what it does not mean
-- [docs/integrations.md](docs/integrations.md) — what Claude Code and Codex actually expose locally
-- `Build.md` — the full build specification
+- [docs/scoring.md](docs/scoring.md) — what every score means and does not mean
+- [docs/integrations.md](docs/integrations.md) — what Claude Code and Codex actually expose
+
+---
 
 ## License
 

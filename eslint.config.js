@@ -5,6 +5,10 @@ export default tseslint.config(
   {
     ignores: [
       "**/dist/**",
+      // Build output: the bundled CLI and the exported dashboard. Linting
+      // generated code reports thousands of problems about code nobody wrote.
+      "dist-package/**",
+      "apps/web/out/**",
       "**/.next/**",
       "**/node_modules/**",
       "**/*.d.ts",

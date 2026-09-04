@@ -112,14 +112,7 @@ const manifest = {
   files: ["observatory.mjs", "dashboard", "migrations", "README.md"],
   engines: rootPackage.engines,
   dependencies: runtimeDependencies(),
-  keywords: [
-    "claude-code",
-    "codex",
-    "ai-agent",
-    "observability",
-    "telemetry",
-    "developer-tools",
-  ],
+  keywords: ["claude-code", "codex", "ai-agent", "observability", "telemetry", "developer-tools"],
 };
 
 writeFileSync(join(outDir, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
