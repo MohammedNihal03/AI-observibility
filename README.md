@@ -64,11 +64,11 @@ number comes with the reason behind it; you should never see a score without an 
 npm install -g ai-agent-observatory
 ```
 
-> **Not on npm yet.** Until it is published, install it from a clone instead — same result, one
-> extra minute:
+> **Prefer to build it yourself?** Same result, one extra minute:
 >
 > ```bash
-> git clone <this repo> && cd ai-agent-observatory
+> git clone https://github.com/MohammedNihal03/AI-observibility.git
+> cd AI-observibility
 > npm install && npm run package
 > npm install -g ./dist-package
 > ```
