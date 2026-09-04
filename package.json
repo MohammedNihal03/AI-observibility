@@ -5,6 +5,15 @@
   "description": "Local-first behavioral observability for Claude Code. See whether your AI coding agent is improving, stuck, or repeating itself - and why.",
   "license": "MIT",
   "type": "module",
+  "author": "MohammedNihal03",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MohammedNihal03/AI-observibility.git"
+  },
+  "homepage": "https://github.com/MohammedNihal03/AI-observibility#readme",
+  "bugs": {
+    "url": "https://github.com/MohammedNihal03/AI-observibility/issues"
+  },
   "engines": {
     "node": ">=20.11.0"
   },

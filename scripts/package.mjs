@@ -107,12 +107,25 @@ const manifest = {
   version: rootPackage.version,
   description: rootPackage.description,
   license: rootPackage.license,
+  author: rootPackage.author,
+  repository: rootPackage.repository,
+  homepage: rootPackage.homepage,
+  bugs: rootPackage.bugs,
   type: "module",
   bin: { observatory: "./observatory.mjs" },
   files: ["observatory.mjs", "dashboard", "migrations", "README.md"],
   engines: rootPackage.engines,
   dependencies: runtimeDependencies(),
-  keywords: ["claude-code", "codex", "ai-agent", "observability", "telemetry", "developer-tools"],
+  // Search terms for what it does TODAY. Codex is planned, not shipped, and a
+  // keyword is a promise to whoever searched for it.
+  keywords: [
+    "claude-code",
+    "claude",
+    "ai-agent",
+    "observability",
+    "telemetry",
+    "developer-tools",
+  ],
 };
 
 writeFileSync(join(outDir, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
