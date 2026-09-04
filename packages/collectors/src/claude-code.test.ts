@@ -186,7 +186,8 @@ describe("parseTranscript", () => {
       ),
     ]);
 
-    const command = parsed.events[0]?.tool?.command ?? "";
+    const command =
+      parsed.events.find((event) => event.tool?.command !== undefined)?.tool?.command ?? "";
     expect(command.length).toBeLessThan(600);
     expect(command).toContain("truncated");
     expect(command).toContain(String(payload.length));
@@ -208,7 +209,10 @@ describe("parseTranscript", () => {
       ),
     ]);
 
-    const [first, second] = parsed.events.map((event) => event.tool?.command);
+    const [first, second] = parsed.events
+      .filter((event) => event.tool?.command !== undefined)
+      .map((event) => event.tool?.command);
+    expect(first).toBeDefined();
     expect(first).not.toBe(second);
   });
 
@@ -316,16 +320,111 @@ describe("parseTranscript", () => {
       ),
     ]);
 
-    const targets = parsed.events.map((event) => event.tool?.target);
+    const searches = parsed.events.filter((event) => event.type === "search");
     // Without a target both would share one signature and read as repetition.
-    expect(targets).toEqual(["createStore", "createHub"]);
-    expect(parsed.events.every((event) => event.type === "search")).toBe(true);
+    expect(searches.map((event) => event.tool?.target)).toEqual(["createStore", "createHub"]);
   });
 
   it("returns an empty result for an empty transcript", () => {
     const empty = parseTranscript([]);
     expect(empty.events).toEqual([]);
     expect(empty.session.sessionId).toBeNull();
+  });
+
+  /* ------------------------------------------------------------------------ */
+  /* What Claude Code reports beyond the actions themselves                   */
+  /* ------------------------------------------------------------------------ */
+
+  const title = (aiTitle: string, seconds: number): string =>
+    JSON.stringify({ type: "ai-title", aiTitle, timestamp: TS(seconds), sessionId: "sess-real" });
+
+  it("keeps the last title, because Claude refines it as the session goes", () => {
+    const parsed = parseTranscript([
+      title("Phase 6", 1),
+      user("go with phase 6", 2),
+      title("Phase 6 demo generator", 30),
+    ]);
+
+    expect(parsed.session.title).toBe("Phase 6 demo generator");
+    expect(parsed.events[0]?.type).toBe("session_started");
+    expect(parsed.events[0]?.metadata?.["title"]).toBe("Phase 6 demo generator");
+  });
+
+  it("omits the title entirely when Claude never named the session", () => {
+    const parsed = parseTranscript([user("do a thing", 0)]);
+    expect(parsed.session.title).toBeNull();
+    expect(parsed.events[0]?.metadata?.["title"]).toBeUndefined();
+  });
+
+  it("counts edited lines from the patch without carrying the code", () => {
+    const parsed = parseTranscript([
+      assistant(
+        "msg_p",
+        [{ type: "tool_use", id: "p1", name: "Edit", input: { file_path: "/repo/src/a.ts" } }],
+        null,
+        1,
+      ),
+      JSON.stringify({
+        type: "user",
+        uuid: "uu-patch",
+        timestamp: TS(2),
+        sessionId: "sess-real",
+        cwd: "/repo",
+        message: { role: "user", content: [{ type: "tool_result", tool_use_id: "p1" }] },
+        toolUseResult: {
+          structuredPatch: [
+            { lines: ["+const a = SECRET_VALUE;", "+const b = 2;", "-const old = 1;"] },
+          ],
+        },
+      }),
+    ]);
+
+    const result = parsed.events.find((event) => event.type === "tool_result");
+    expect(result?.metadata?.["linesAdded"]).toBe(2);
+    expect(result?.metadata?.["linesRemoved"]).toBe(1);
+    // The count travels; the content does not.
+    expect(JSON.stringify(parsed.events)).not.toContain("SECRET_VALUE");
+  });
+
+  it("treats a timed-out command as a failure, though the transcript does not", () => {
+    const parsed = parseTranscript([
+      assistant(
+        "msg_t",
+        [{ type: "tool_use", id: "t1", name: "Bash", input: { command: "npm test" } }],
+        null,
+        1,
+      ),
+      JSON.stringify({
+        type: "user",
+        uuid: "uu-timeout",
+        timestamp: TS(122),
+        sessionId: "sess-real",
+        cwd: "/repo",
+        // Claude Code marks a timeout `is_error: false`. Counting it as a
+        // success would inflate both success rate and tool efficiency.
+        message: {
+          role: "user",
+          content: [{ type: "tool_result", tool_use_id: "t1", is_error: false }],
+        },
+        toolUseResult: { timedOutAfterMs: 120_000 },
+      }),
+    ]);
+
+    const result = parsed.events.find((event) => event.type === "tool_result");
+    expect(result?.result?.status).toBe("error");
+    expect(result?.metadata?.["timedOut"]).toBe(true);
+    expect(result?.metadata?.["timedOutAfterMs"]).toBe(120_000);
+  });
+
+  it("reports thinking and cache tokens without double-counting them", () => {
+    const parsed = parseTranscript([
+      assistant("msg_u", [{ type: "text", text: "hi" }], { ...USAGE, output_tokens: 250 }, 1),
+    ]);
+
+    const response = parsed.events.find((event) => event.type === "model_response");
+    expect(response?.tokens?.output).toBe(250);
+    expect(response?.metadata?.["cacheRead"]).toBe(30_000);
+    expect(response?.metadata?.["cacheCreation"]).toBe(400);
   });
 });
 

@@ -22,8 +22,20 @@ export function SessionBar({
   received: number;
   live: boolean;
 }) {
-  const { session, scores } = snapshot;
+  const { session, scores, detail } = snapshot;
   const shortId = session.id.slice(-4).toUpperCase();
+
+  /*
+   * The agent's own title wins the headline when it wrote one.
+   *
+   * Claude Code names the session from the whole conversation ("Phase 6 demo
+   * generator"), which describes the work far better than the opening prompt -
+   * which is often a typo-ridden fragment. The prompt still shows, one line
+   * below, because it is what actually started the session and the title is a
+   * summary of it rather than a replacement for it.
+   */
+  const heading = detail.title ?? session.goal ?? "Untitled session";
+  const subheading = detail.title !== null ? session.goal : null;
 
   return (
     <div
@@ -44,15 +56,22 @@ export function SessionBar({
 
         <div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 className="text-xl font-medium tracking-tight text-fg sm:text-2xl">
-              {session.goal ?? "Untitled session"}
-            </h1>
+            <h1 className="text-xl font-medium tracking-tight text-fg sm:text-2xl">{heading}</h1>
             {session.simulated ? (
               <span className="rounded-md border border-border bg-surface px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-fg-faint">
                 simulated
               </span>
             ) : null}
           </div>
+
+          {subheading === null ? null : (
+            <p
+              className="mt-1.5 max-w-xl truncate text-[13px] leading-snug text-fg-muted"
+              title={subheading}
+            >
+              {subheading}
+            </p>
+          )}
 
           <p className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 font-mono text-[11px] text-fg-faint">
             <span className="text-fg-muted">{session.source.replace("_", " ")}</span>

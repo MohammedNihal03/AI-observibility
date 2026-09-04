@@ -212,6 +212,84 @@ describe("GET /api/sessions/:id", () => {
     const response = await buildApp().inject({ method: "GET", url: "/api/sessions/nope" });
     expect(response.statusCode).toBe(404);
   });
+
+  it("leaves reported detail null when the adapter measured none of it", async () => {
+    const instance = buildApp();
+    const { sessionId } = await seed(instance);
+    const { detail } = (
+      await instance.inject({ method: "GET", url: `/api/sessions/${sessionId}` })
+    ).json<SessionSnapshot>();
+
+    // A generated session has no diff to count and no reasoning to bill.
+    expect(detail.title).toBeNull();
+    expect(detail.linesAdded).toBeNull();
+    expect(detail.thinkingTokens).toBeNull();
+    expect(detail.cacheHitRate).toBeNull();
+  });
+
+  it("totals the detail an adapter did report", async () => {
+    const instance = buildApp();
+    const startedAt = "2026-09-03T10:00:00.000Z";
+
+    await instance.inject({
+      method: "POST",
+      url: "/api/sessions",
+      payload: { id: "cc_detail", source: "claude_code", startedAt },
+    });
+
+    await instance.inject({
+      method: "POST",
+      url: "/api/sessions/cc_detail/events",
+      payload: {
+        events: [
+          {
+            source: "claude_code",
+            type: "session_started",
+            timestamp: startedAt,
+            metadata: { title: "Rename the token store" },
+          },
+          {
+            source: "claude_code",
+            type: "model_response",
+            timestamp: "2026-09-03T10:00:01.000Z",
+            metadata: { thinkingTokens: 900, cacheRead: 9_000, cacheCreation: 1_000 },
+          },
+          {
+            source: "claude_code",
+            type: "tool_result",
+            timestamp: "2026-09-03T10:00:02.000Z",
+            result: { status: "success" },
+            metadata: { linesAdded: 12, linesRemoved: 4 },
+          },
+          {
+            source: "claude_code",
+            type: "tool_result",
+            timestamp: "2026-09-03T10:00:03.000Z",
+            result: { status: "success" },
+            metadata: { linesAdded: 8, linesRemoved: 1 },
+          },
+          {
+            source: "claude_code",
+            type: "tool_result",
+            timestamp: "2026-09-03T10:02:03.000Z",
+            result: { status: "error" },
+            metadata: { timedOut: true, timedOutAfterMs: 120_000 },
+          },
+        ],
+      },
+    });
+
+    const { detail } = (
+      await instance.inject({ method: "GET", url: "/api/sessions/cc_detail" })
+    ).json<SessionSnapshot>();
+
+    expect(detail.title).toBe("Rename the token store");
+    expect(detail.linesAdded).toBe(20);
+    expect(detail.linesRemoved).toBe(5);
+    expect(detail.thinkingTokens).toBe(900);
+    expect(detail.cacheHitRate).toBeCloseTo(0.9, 5);
+    expect(detail.timedOutCommands).toBe(1);
+  });
 });
 
 describe("GET /api/sessions", () => {

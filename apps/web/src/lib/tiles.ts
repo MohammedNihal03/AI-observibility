@@ -45,6 +45,11 @@ export function clockOf(timestamp: string): string {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
 
+/** Whole numbers with thousands separators: 2011 -> "2,011". */
+export function grouped(value: number): string {
+  return value.toLocaleString("en-US");
+}
+
 function band(value: number | null, good: number, fair: number): MetricTone {
   if (value === null) return "neutral";
   if (value >= good) return "healthy";
@@ -124,4 +129,79 @@ export function buildTiles(snapshot: SessionSnapshot): readonly MetricTile[] {
       tone: contextTone,
     },
   ];
+}
+
+/* -------------------------------------------------------------------------- */
+/* Reported detail                                                            */
+/* -------------------------------------------------------------------------- */
+
+export interface DetailStat {
+  readonly key: string;
+  readonly label: string;
+  readonly value: string;
+  readonly note: string;
+  readonly tone: MetricTone;
+}
+
+/**
+ * The extra figures an adapter reported, as display rows.
+ *
+ * A row is built only when its number was actually reported, so a session from
+ * an adapter that measures none of this renders nothing at all rather than a
+ * line of "n/a" - the strip is evidence, not a placeholder.
+ */
+export function buildDetailStats(snapshot: SessionSnapshot): readonly DetailStat[] {
+  const { detail } = snapshot;
+  const stats: DetailStat[] = [];
+
+  if (detail.linesAdded !== null || detail.linesRemoved !== null) {
+    const added = detail.linesAdded ?? 0;
+    const removed = detail.linesRemoved ?? 0;
+    stats.push({
+      key: "lines",
+      label: "Lines changed",
+      value: `+${grouped(added)} \u2212${grouped(removed)}`,
+      note: `${grouped(added + removed)} total across edits`,
+      tone: "neutral",
+    });
+  }
+
+  if (detail.thinkingTokens !== null) {
+    stats.push({
+      key: "thinking",
+      label: "Thinking",
+      value: compact(detail.thinkingTokens),
+      note: "reasoning tokens, inside output",
+      tone: "neutral",
+    });
+  }
+
+  if (detail.cacheHitRate !== null) {
+    stats.push({
+      key: "cache",
+      label: "Cache hits",
+      value: percent(detail.cacheHitRate),
+      note: `${compact(detail.cacheReadTokens ?? 0)} reused vs ${compact(
+        detail.cacheCreationTokens ?? 0,
+      )} written`,
+      // A high hit rate is the cheap path, so it reads as healthy rather than
+      // neutral - it is the one number here a user can act on.
+      tone: detail.cacheHitRate >= 0.8 ? "healthy" : detail.cacheHitRate >= 0.5 ? "warn" : "danger",
+    });
+  }
+
+  if (stats.length > 0 || detail.timedOutCommands > 0) {
+    stats.push({
+      key: "timeouts",
+      label: "Timed out",
+      value: String(detail.timedOutCommands),
+      note:
+        detail.timedOutCommands === 0
+          ? "no command hit its limit"
+          : "commands killed at the time limit",
+      tone: detail.timedOutCommands === 0 ? "neutral" : "warn",
+    });
+  }
+
+  return stats;
 }

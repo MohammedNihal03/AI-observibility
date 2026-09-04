@@ -288,6 +288,8 @@ Being straight about the limits, because a number presented confidently is worse
 - Files read and modified, counted as distinct paths
 - Token usage, deduplicated per API response
 - Repetition, correction loops, and every score built on them
+- Lines added and removed, counted from the patch — the count, never the code
+- Thinking tokens, cache hit rate, and commands killed at their time limit
 
 **Not available:**
 

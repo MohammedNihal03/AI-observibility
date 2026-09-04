@@ -4,6 +4,7 @@ import { useObservatory } from "@/lib/use-observatory";
 
 import { ActivityTimeline } from "./activity-timeline";
 import { AppShell } from "./app-shell";
+import { DetailStrip } from "./detail-strip";
 import { DashboardSkeleton, EmptyState, UnreachableState } from "./empty-state";
 import { HealthCard } from "./health-card";
 import { MetricRail } from "./metric-rail";
@@ -66,6 +67,8 @@ export function DashboardApp() {
       </div>
 
       <MetricRail snapshot={snapshot} />
+
+      <DetailStrip snapshot={snapshot} />
 
       <div className="grid gap-4 sm:gap-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
         <PerformanceChart snapshot={snapshot} />

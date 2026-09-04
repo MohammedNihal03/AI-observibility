@@ -3276,6 +3276,42 @@ function reportedContextWindow(events2) {
   }
   return null;
 }
+function buildDetail(events2) {
+  let title = null;
+  let added = null;
+  let removed = null;
+  let thinking = null;
+  let cacheRead = null;
+  let cacheCreation = null;
+  let timedOut = 0;
+  const add = (total, value2) => typeof value2 === "number" && Number.isFinite(value2) ? (total ?? 0) + value2 : total;
+  for (const event of events2) {
+    const meta = event.metadata;
+    if (meta === null || meta === void 0)
+      continue;
+    if (typeof meta["title"] === "string" && meta["title"].length > 0)
+      title = meta["title"];
+    added = add(added, meta["linesAdded"]);
+    removed = add(removed, meta["linesRemoved"]);
+    thinking = add(thinking, meta["thinkingTokens"]);
+    cacheRead = add(cacheRead, meta["cacheRead"]);
+    cacheCreation = add(cacheCreation, meta["cacheCreation"]);
+    if (meta["timedOut"] === true)
+      timedOut += 1;
+  }
+  const cacheTotal = (cacheRead ?? 0) + (cacheCreation ?? 0);
+  const cacheHitRate = cacheTotal > 0 ? (cacheRead ?? 0) / cacheTotal : null;
+  return {
+    title,
+    linesAdded: added,
+    linesRemoved: removed,
+    thinkingTokens: thinking,
+    cacheReadTokens: cacheRead,
+    cacheCreationTokens: cacheCreation,
+    cacheHitRate,
+    timedOutCommands: timedOut
+  };
+}
 function analyzeStoredSession(store, sessionId) {
   const record = store.sessions.get(sessionId);
   if (record === void 0)
@@ -3308,6 +3344,7 @@ function buildSnapshot(analyzed, options = {}) {
       simulated: analyzed.simulated,
       contextWindow: analyzed.contextWindow
     },
+    detail: buildDetail(events2),
     scores: {
       health: analysis.health.score,
       healthState: analysis.health.state,
@@ -4398,9 +4435,44 @@ function toolEvent(block, timestamp, cwd) {
   }
   return event;
 }
-function resultEvent(block, timestamp) {
+function countPatch(patch) {
+  if (!Array.isArray(patch))
+    return null;
+  let added = 0;
+  let removed = 0;
+  for (const entry of patch) {
+    const hunk = asRecord(entry);
+    const lines = hunk?.["lines"];
+    if (!Array.isArray(lines))
+      continue;
+    for (const line of lines) {
+      if (typeof line !== "string")
+        continue;
+      if (line.startsWith("+"))
+        added += 1;
+      else if (line.startsWith("-"))
+        removed += 1;
+    }
+  }
+  return { added, removed };
+}
+function resultEvent(block, detail, timestamp) {
   const callId = asString(block["tool_use_id"]);
-  const failed = block["is_error"] === true;
+  const timedOutAfterMs = detail?.["timedOutAfterMs"];
+  const timedOut = typeof timedOutAfterMs === "number";
+  const failed = block["is_error"] === true || timedOut;
+  const patch = countPatch(detail?.["structuredPatch"]);
+  const metadata = {};
+  if (callId !== void 0)
+    metadata["callId"] = callId;
+  if (timedOut) {
+    metadata["timedOut"] = true;
+    metadata["timedOutAfterMs"] = timedOutAfterMs;
+  }
+  if (patch !== null && patch.added + patch.removed > 0) {
+    metadata["linesAdded"] = patch.added;
+    metadata["linesRemoved"] = patch.removed;
+  }
   return {
     source: "claude_code",
     type: "tool_result",
@@ -4412,7 +4484,7 @@ function resultEvent(block, timestamp) {
       confidence: "reported",
       ...failed ? { exitCode: 1 } : { exitCode: 0 }
     },
-    ...callId !== void 0 ? { metadata: { callId } } : {}
+    ...Object.keys(metadata).length > 0 ? { metadata } : {}
   };
 }
 function parseTranscript(lines, options = {}) {
@@ -4421,6 +4493,7 @@ function parseTranscript(lines, options = {}) {
   const seenUsage = /* @__PURE__ */ new Set();
   const state = {
     sessionId: null,
+    title: null,
     model: null,
     cwd: null,
     gitBranch: null,
@@ -4474,7 +4547,7 @@ function parseTranscript(lines, options = {}) {
           const block = asRecord(item);
           if (block === null || block["type"] !== "tool_result")
             continue;
-          const event = resultEvent(block, timestamp);
+          const event = resultEvent(block, asRecord(entry["toolUseResult"]), timestamp);
           if (event !== null) {
             events2.push(event);
             emitted = true;
@@ -4513,12 +4586,21 @@ function parseTranscript(lines, options = {}) {
           const output = asCount(usage["output_tokens"]);
           const cached = asCount(usage["cache_read_input_tokens"]) + asCount(usage["cache_creation_input_tokens"]);
           if (input + output + cached > 0) {
+            const details = asRecord(usage["output_tokens_details"]);
+            const thinking = asCount(details?.["thinking_tokens"]);
+            const cacheRead = asCount(usage["cache_read_input_tokens"]);
+            const cacheCreation = asCount(usage["cache_creation_input_tokens"]);
             events2.push({
               source: "claude_code",
               type: "model_response",
               timestamp,
               tokens: { input, output, cached },
-              ...messageId !== void 0 ? { metadata: { messageId } } : {}
+              metadata: {
+                ...messageId !== void 0 ? { messageId } : {},
+                ...thinking > 0 ? { thinkingTokens: thinking } : {},
+                ...cacheRead > 0 ? { cacheRead } : {},
+                ...cacheCreation > 0 ? { cacheCreation } : {}
+              }
             });
           }
         }
@@ -4538,11 +4620,31 @@ function parseTranscript(lines, options = {}) {
         skipped += 1;
       continue;
     }
+    if (type === "ai-title") {
+      const title = asString(entry["aiTitle"]);
+      if (title !== void 0)
+        state.title = title;
+      skipped += 1;
+      continue;
+    }
     skipped += 1;
+  }
+  if (state.startedAt !== null) {
+    events2.unshift({
+      source: "claude_code",
+      type: "session_started",
+      timestamp: state.startedAt,
+      metadata: {
+        ...state.title !== null ? { title: state.title } : {},
+        ...state.gitBranch !== null ? { gitBranch: state.gitBranch } : {},
+        ...state.version !== null ? { agentVersion: state.version } : {}
+      }
+    });
   }
   return {
     session: {
       sessionId: state.sessionId,
+      title: state.title,
       model: state.model,
       cwd: state.cwd,
       gitBranch: state.gitBranch,

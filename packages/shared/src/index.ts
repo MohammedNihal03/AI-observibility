@@ -133,6 +133,7 @@ export type {
   HealthComponentView,
   SessionSnapshot,
   SessionSummary,
+  SnapshotDetail,
   SnapshotScores,
   SnapshotSession,
   SnapshotSignal,

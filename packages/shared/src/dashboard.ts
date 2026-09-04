@@ -68,6 +68,29 @@ export interface SnapshotScores {
   readonly degradation: number | null;
 }
 
+/**
+ * Figures an adapter may supply beyond the core metrics.
+ *
+ * Every field is nullable, and null means the adapter did not report it rather
+ * than zero. A simulated session has no diff to count and no thinking tokens to
+ * report, and showing "0 lines changed" for one would be a measurement it never
+ * made.
+ */
+export interface SnapshotDetail {
+  /** The agent's own title for the session, when it generated one. */
+  readonly title: string | null;
+  readonly linesAdded: number | null;
+  readonly linesRemoved: number | null;
+  /** Reasoning tokens. Already counted inside output tokens, never added twice. */
+  readonly thinkingTokens: number | null;
+  readonly cacheReadTokens: number | null;
+  readonly cacheCreationTokens: number | null;
+  /** Cached reads over all cached tokens, 0-1. The cost lever. */
+  readonly cacheHitRate: number | null;
+  /** Commands that ran out of time. Counted as failures, not successes. */
+  readonly timedOutCommands: number;
+}
+
 export interface SnapshotSession {
   readonly id: string;
   readonly source: AgentSource;
@@ -99,6 +122,7 @@ export interface SnapshotSignal {
 /** Everything the dashboard needs for one session, in one payload. */
 export interface SessionSnapshot {
   readonly session: SnapshotSession;
+  readonly detail: SnapshotDetail;
   readonly scores: SnapshotScores;
   readonly metrics: SessionMetrics;
   readonly windows: readonly SnapshotWindow[];

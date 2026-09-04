@@ -141,9 +141,11 @@ describe("importClaudeCodeSession", () => {
     expect(client.created[0]?.["goal"]).toBe("Fix the flaky billing test");
     expect(client.created[0]?.["source"]).toBe("claude_code");
 
-    // The prompt, the model turn, the read it performed, and its result.
-    expect(result.sent).toBe(4);
+    // The synthesized start, the prompt, the model turn, the read it performed,
+    // and its result.
+    expect(result.sent).toBe(5);
     expect(client.sent.map((event) => event.type)).toEqual([
+      "session_started",
       "user_message",
       "model_response",
       "file_read",
@@ -158,16 +160,16 @@ describe("importClaudeCodeSession", () => {
   });
 
   it("appends only what the server does not already have", async () => {
-    const client = fakeClient({ existing: 3 });
+    const client = fakeClient({ existing: 4 });
     const result = await importClaudeCodeSession({ home, client });
 
     expect(client.created).toHaveLength(0);
-    expect(result.alreadyStored).toBe(3);
+    expect(result.alreadyStored).toBe(4);
     expect(client.sent).toHaveLength(1);
   });
 
   it("sends nothing twice when re-run against a complete session", async () => {
-    const client = fakeClient({ existing: 4 });
+    const client = fakeClient({ existing: 5 });
     const result = await importClaudeCodeSession({ home, client });
     expect(result.sent).toBe(0);
     expect(client.sent).toEqual([]);

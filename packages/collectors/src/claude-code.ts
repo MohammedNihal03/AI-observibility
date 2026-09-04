@@ -113,6 +113,15 @@ function asCount(value: unknown): number {
 
 export interface TranscriptSession {
   readonly sessionId: string | null;
+  /**
+   * The title Claude Code generated for the session.
+   *
+   * Far better than the first user message, which is what the goal falls back
+   * to: real prompts open with pasted code, IDE context, or a typo. Claude
+   * refines the title as the session goes ("Phase 6" became "Phase 6 demo
+   * generator"), so the LAST one is the one that saw the whole session.
+   */
+  readonly title: string | null;
   readonly model: string | null;
   readonly cwd: string | null;
   readonly gitBranch: string | null;
@@ -152,6 +161,7 @@ const DEFAULT_MAX_GOAL = 240;
 
 interface Mutable {
   sessionId: string | null;
+  title: string | null;
   model: string | null;
   cwd: string | null;
   gitBranch: string | null;
@@ -275,10 +285,70 @@ function toolEvent(
   return event;
 }
 
-/** Tool results, where `is_error` makes failure a fact rather than a guess. */
-function resultEvent(block: Record<string, unknown>, timestamp: string): AgentEventInput | null {
+/**
+ * Counts the lines a diff added and removed, without keeping any of them.
+ *
+ * `structuredPatch` carries the actual hunks - real source code - so it is
+ * measured and dropped. Edit volume is one of the few honest measures of how
+ * much work a session produced.
+ */
+function countPatch(patch: unknown): { added: number; removed: number } | null {
+  if (!Array.isArray(patch)) return null;
+
+  let added = 0;
+  let removed = 0;
+  for (const entry of patch) {
+    const hunk = asRecord(entry);
+    const lines = hunk?.["lines"];
+    if (!Array.isArray(lines)) continue;
+    for (const line of lines) {
+      if (typeof line !== "string") continue;
+      if (line.startsWith("+")) added += 1;
+      else if (line.startsWith("-")) removed += 1;
+    }
+  }
+
+  return { added, removed };
+}
+
+/**
+ * Tool results, where `is_error` makes failure a fact rather than a guess.
+ *
+ * `detail` is the line-level `toolUseResult` that sits beside the content
+ * block. It carries the diff and the timeout, neither of which appears in the
+ * block itself.
+ */
+function resultEvent(
+  block: Record<string, unknown>,
+  detail: Record<string, unknown> | null,
+  timestamp: string,
+): AgentEventInput | null {
   const callId = asString(block["tool_use_id"]);
-  const failed = block["is_error"] === true;
+
+  /*
+   * A command that ran out of time did not succeed.
+   *
+   * Claude Code records the timeout in `toolUseResult.timedOutAfterMs` but
+   * leaves `is_error` false, so a 120-second timeout was being counted as a
+   * successful tool call - inflating success rate and tool efficiency, and
+   * hiding a failure mode that matters more than most.
+   */
+  const timedOutAfterMs = detail?.["timedOutAfterMs"];
+  const timedOut = typeof timedOutAfterMs === "number";
+  const failed = block["is_error"] === true || timedOut;
+
+  const patch = countPatch(detail?.["structuredPatch"]);
+
+  const metadata: Record<string, unknown> = {};
+  if (callId !== undefined) metadata["callId"] = callId;
+  if (timedOut) {
+    metadata["timedOut"] = true;
+    metadata["timedOutAfterMs"] = timedOutAfterMs;
+  }
+  if (patch !== null && patch.added + patch.removed > 0) {
+    metadata["linesAdded"] = patch.added;
+    metadata["linesRemoved"] = patch.removed;
+  }
 
   return {
     source: "claude_code",
@@ -291,7 +361,7 @@ function resultEvent(block: Record<string, unknown>, timestamp: string): AgentEv
       confidence: "reported",
       ...(failed ? { exitCode: 1 } : { exitCode: 0 }),
     },
-    ...(callId !== undefined ? { metadata: { callId } } : {}),
+    ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
   };
 }
 
@@ -312,6 +382,7 @@ export function parseTranscript(
 
   const state: Mutable = {
     sessionId: null,
+    title: null,
     model: null,
     cwd: null,
     gitBranch: null,
@@ -374,7 +445,7 @@ export function parseTranscript(
         for (const item of content) {
           const block = asRecord(item);
           if (block === null || block["type"] !== "tool_result") continue;
-          const event = resultEvent(block, timestamp);
+          const event = resultEvent(block, asRecord(entry["toolUseResult"]), timestamp);
           if (event !== null) {
             events.push(event);
             emitted = true;
@@ -425,12 +496,24 @@ export function parseTranscript(
             asCount(usage["cache_creation_input_tokens"]);
 
           if (input + output + cached > 0) {
+            const details = asRecord(usage["output_tokens_details"]);
+            // Thinking is already inside `output_tokens`, so it travels as its
+            // own figure rather than being added again.
+            const thinking = asCount(details?.["thinking_tokens"]);
+            const cacheRead = asCount(usage["cache_read_input_tokens"]);
+            const cacheCreation = asCount(usage["cache_creation_input_tokens"]);
+
             events.push({
               source: "claude_code",
               type: "model_response",
               timestamp,
               tokens: { input, output, cached },
-              ...(messageId !== undefined ? { metadata: { messageId } } : {}),
+              metadata: {
+                ...(messageId !== undefined ? { messageId } : {}),
+                ...(thinking > 0 ? { thinkingTokens: thinking } : {}),
+                ...(cacheRead > 0 ? { cacheRead } : {}),
+                ...(cacheCreation > 0 ? { cacheCreation } : {}),
+              },
             });
           }
         }
@@ -451,14 +534,44 @@ export function parseTranscript(
       continue;
     }
 
-    // Bookkeeping lines: ai-title, last-prompt, file-history-snapshot, and
-    // whatever the next release adds. Counted, not fatal.
+    if (type === "ai-title") {
+      // Overwritten deliberately: the title improves as the session goes on.
+      const title = asString(entry["aiTitle"]);
+      if (title !== undefined) state.title = title;
+      skipped += 1;
+      continue;
+    }
+
+    // Bookkeeping lines: last-prompt, file-history-snapshot, and whatever the
+    // next release adds. Counted, not fatal.
     skipped += 1;
+  }
+
+  /*
+   * A synthesized session-start event.
+   *
+   * Claude Code writes no explicit "session began" line, but the session did
+   * begin, and the server reads session-level facts from event metadata rather
+   * than from a side channel. Emitted last and prepended because the title is
+   * only final once the whole transcript has been read.
+   */
+  if (state.startedAt !== null) {
+    events.unshift({
+      source: "claude_code",
+      type: "session_started",
+      timestamp: state.startedAt,
+      metadata: {
+        ...(state.title !== null ? { title: state.title } : {}),
+        ...(state.gitBranch !== null ? { gitBranch: state.gitBranch } : {}),
+        ...(state.version !== null ? { agentVersion: state.version } : {}),
+      },
+    });
   }
 
   return {
     session: {
       sessionId: state.sessionId,
+      title: state.title,
       model: state.model,
       cwd: state.cwd,
       gitBranch: state.gitBranch,

@@ -15,6 +15,7 @@ import {
   type SessionRecord,
   type SessionSnapshot,
   type SessionSummary,
+  type SnapshotDetail,
   type TimelineEntry,
   type TrendPoint,
 } from "@observatory/shared";
@@ -221,6 +222,60 @@ function reportedContextWindow(events: readonly NormalizedAgentEvent[]): number 
   return null;
 }
 
+/**
+ * Session-level figures an adapter reported alongside the events.
+ *
+ * These are read out of event metadata rather than recomputed, because they are
+ * observations the adapter made and the engine has no way to re-derive: how many
+ * lines a patch touched, how many tokens went to reasoning, whether a command
+ * ran out of time. Anything nobody reported stays null - a demo session shows
+ * "n/a" for edit volume rather than a zero it never measured.
+ */
+function buildDetail(events: readonly NormalizedAgentEvent[]): SnapshotDetail {
+  let title: string | null = null;
+  let added: number | null = null;
+  let removed: number | null = null;
+  let thinking: number | null = null;
+  let cacheRead: number | null = null;
+  let cacheCreation: number | null = null;
+  let timedOut = 0;
+
+  const add = (total: number | null, value: unknown): number | null =>
+    typeof value === "number" && Number.isFinite(value) ? (total ?? 0) + value : total;
+
+  for (const event of events) {
+    const meta = event.metadata;
+    if (meta === null || meta === undefined) continue;
+
+    if (typeof meta["title"] === "string" && meta["title"].length > 0) title = meta["title"];
+    added = add(added, meta["linesAdded"]);
+    removed = add(removed, meta["linesRemoved"]);
+    thinking = add(thinking, meta["thinkingTokens"]);
+    cacheRead = add(cacheRead, meta["cacheRead"]);
+    cacheCreation = add(cacheCreation, meta["cacheCreation"]);
+    if (meta["timedOut"] === true) timedOut += 1;
+  }
+
+  /*
+   * Reads over everything that went through the cache. Creation is what a first
+   * pass had to write; reads are what every later turn got back cheaply, so the
+   * ratio is the share of cached context that came for near-free.
+   */
+  const cacheTotal = (cacheRead ?? 0) + (cacheCreation ?? 0);
+  const cacheHitRate = cacheTotal > 0 ? (cacheRead ?? 0) / cacheTotal : null;
+
+  return {
+    title,
+    linesAdded: added,
+    linesRemoved: removed,
+    thinkingTokens: thinking,
+    cacheReadTokens: cacheRead,
+    cacheCreationTokens: cacheCreation,
+    cacheHitRate,
+    timedOutCommands: timedOut,
+  };
+}
+
 export interface AnalyzedSession {
   readonly record: SessionRecord;
   readonly events: readonly NormalizedAgentEvent[];
@@ -278,6 +333,7 @@ export function buildSnapshot(
       simulated: analyzed.simulated,
       contextWindow: analyzed.contextWindow,
     },
+    detail: buildDetail(events),
     scores: {
       health: analysis.health.score,
       healthState: analysis.health.state,
